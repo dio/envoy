@@ -140,7 +140,7 @@ void MetadataMapWrapper::setValue(lua_State* state, const ProtobufWkt::Value&& v
 }
 
 void MetadataMapWrapper::createTable(
-    lua_State* state, const google::protobuf::Map<std::string, ProtobufWkt::Value>&& fields) {
+    lua_State* state, const ProtobufWkt::Map<std::string, ProtobufWkt::Value>&& fields) {
   lua_createtable(state, 0, fields.size());
   for (const auto field : fields) {
     int top = lua_gettop(state);

@@ -120,7 +120,7 @@ private:
 
   void setValue(lua_State* state, const ProtobufWkt::Value&& value);
   void createTable(lua_State* state,
-                   const google::protobuf::Map<std::string, ProtobufWkt::Value>&& fields);
+                   const ProtobufWkt::Map<std::string, ProtobufWkt::Value>&& fields);
 
   const envoy::api::v2::core::Metadata& metadata_;
 };
