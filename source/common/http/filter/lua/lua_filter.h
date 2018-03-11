@@ -236,6 +236,11 @@ public:
 
   // Http::StreamDecoderFilter
   FilterHeadersStatus decodeHeaders(HeaderMap& headers, bool end_stream) override {
+    Router::RouteConstSharedPtr route = decoder_callbacks_.callbacks_->route();
+    ASSERT(route != nullptr);
+    const Router::RouteEntry* route_entry = route->routeEntry();
+    ASSERT(route_entry != nullptr);
+    route_entry->metadata();
     return doHeaders(request_stream_wrapper_, decoder_callbacks_, config_->requestFunctionRef(),
                      headers, end_stream);
   }
