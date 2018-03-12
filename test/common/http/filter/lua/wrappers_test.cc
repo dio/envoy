@@ -58,22 +58,22 @@ TEST_F(LuaMetadataMapWrapperTest, Methods) {
   InSequence s;
   setup(SCRIPT);
 
-  std::string yaml = R"EOF(
-  filter_metadata:
-    make.delicious.bread:
-      name: pulla
-      origin: finland
-      lactose: true
-      nut: false
-      portion: 5
-      minutes: 30.5
-      butter:
-        type: grass_fed
-        expensive: false
-      ingredients:
-        - fluor
-        - milk
-  )EOF";
+  const std::string yaml = R"EOF(
+filter_metadata:
+  make.delicious.bread:
+    name: pulla
+    origin: finland
+    lactose: true
+    nut: false
+    portion: 5
+    minutes: 30.5
+    butter:
+      type: grass_fed
+      expensive: false
+    ingredients:
+      - fluor
+      - milk
+)EOF";
 
   envoy::api::v2::core::Metadata metadata = parseMetadataFromYaml(yaml);
   MetadataMapWrapper::create(coroutine_->luaState(), metadata);

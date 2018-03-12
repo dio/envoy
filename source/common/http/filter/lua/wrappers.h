@@ -122,7 +122,7 @@ private:
   void createTable(lua_State* state,
                    const ProtobufWkt::Map<std::string, ProtobufWkt::Value>&& fields);
 
-  const envoy::api::v2::core::Metadata& metadata_;
+  const envoy::api::v2::core::Metadata metadata_;
 };
 
 } // namespace Lua
