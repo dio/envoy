@@ -225,6 +225,19 @@ private:
 
   typedef std::unique_ptr<HttpActiveHealthCheckSession> HttpActiveHealthCheckSessionPtr;
 
+  class HeaderValueWrapper {
+  public:
+    HeaderValueWrapper(const std::string& value, bool append) : value_(value), append_(append) {}
+
+    const std::string value() { return value_; }
+    bool append() { return append_; }
+
+  private:
+    const std::string value_;
+    bool append_;
+  };
+  typedef std::unique_ptr<HeaderValueWrapper> HeaderValueWrapperPtr;
+
   virtual Http::CodecClient* createCodecClient(Upstream::Host::CreateConnectionData& data) PURE;
 
   // HealthCheckerImplBase
@@ -235,6 +248,7 @@ private:
   const std::string path_;
   const std::string host_value_;
   absl::optional<std::string> service_name_;
+  std::vector<std::pair<Http::LowerCaseString, HeaderValueWrapperPtr>> headers_to_add_;
 };
 
 /**
