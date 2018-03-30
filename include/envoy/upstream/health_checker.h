@@ -5,6 +5,21 @@
 
 #include "envoy/upstream/upstream.h"
 
+#include "envoy/api/v2/core/health_check.pb.h"
+#include "envoy/event/timer.h"
+#include "envoy/grpc/status.h"
+#include "envoy/http/codec.h"
+#include "envoy/network/connection.h"
+#include "envoy/network/filter.h"
+#include "envoy/runtime/runtime.h"
+#include "envoy/upstream/health_checker.h"
+
+#include "common/common/logger.h"
+#include "common/grpc/codec.h"
+#include "common/http/codec_client.h"
+#include "common/network/filter_impl.h"
+#include "common/protobuf/protobuf.h"
+
 namespace Envoy {
 namespace Upstream {
 
@@ -37,6 +52,16 @@ public:
 };
 
 typedef std::shared_ptr<HealthChecker> HealthCheckerSharedPtr;
+
+class HealthCheckerExtensionFactory {
+public:
+  virtual ~HealthCheckerExtensionFactory() {}
+  virtual HealthCheckerSharedPtr create(const envoy::api::v2::core::HealthCheck& hc_config,
+                                        Upstream::Cluster& cluster, Runtime::Loader& runtime,
+                                        Runtime::RandomGenerator& random,
+                                        Event::Dispatcher& dispatcher) PURE;
+  virtual std::string name() PURE;
+};
 
 } // namespace Upstream
 } // namespace Envoy

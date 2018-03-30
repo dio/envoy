@@ -93,6 +93,14 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "health_checker_interface",
+    hdrs = ["health_checker_impl.h"],
+    deps = [
+        "//include/envoy/upstream:health_checker_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "health_checker_lib",
     srcs = ["health_checker_impl.cc"],
     hdrs = ["health_checker_impl.h"],
@@ -131,6 +139,7 @@ envoy_cc_library(
         # checkers.
         "//source/extensions/filters/network/redis_proxy:conn_pool_lib",
         "@envoy_api//envoy/api/v2/core:health_check_cc",
+        "//source/extensions/health_checkers/redis_health_checker:config",
     ],
 )
 
@@ -183,6 +192,10 @@ envoy_cc_library(
         "//source/common/network:utility_lib",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
+        "//source/common/grpc:codec_lib",
+        "//source/common/grpc:common_lib",
+        "//source/common/http:codec_client_lib",
+        "//source/common/http:header_map_lib",
     ],
 )
 
@@ -195,6 +208,10 @@ envoy_cc_library(
         "//source/common/common:empty_string",
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
+        "//source/common/grpc:codec_lib",
+        "//source/common/grpc:common_lib",
+        "//source/common/http:codec_client_lib",
+        "//source/common/http:header_map_lib",
     ],
 )
 
@@ -273,6 +290,10 @@ envoy_cc_library(
         "//source/common/network:resolver_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/grpc:codec_lib",
+        "//source/common/grpc:common_lib",
+        "//source/common/http:codec_client_lib",
+        "//source/common/http:header_map_lib",
         "@envoy_api//envoy/api/v2:eds_cc",
         "@envoy_api//envoy/api/v2/core:base_cc",
         "@envoy_api//envoy/api/v2/endpoint:endpoint_cc",
