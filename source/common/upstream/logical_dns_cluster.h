@@ -77,6 +77,9 @@ private:
     const envoy::api::v2::core::Locality& locality() const override {
       return envoy::api::v2::core::Locality().default_instance();
     }
+    Network::Address::InstanceConstSharedPtr healthCheckAddress() const override {
+      return address_;
+    }
 
     Network::Address::InstanceConstSharedPtr address_;
     HostConstSharedPtr logical_host_;

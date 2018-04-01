@@ -88,6 +88,13 @@ HostImpl::createConnection(Event::Dispatcher& dispatcher,
   return {createConnection(dispatcher, *cluster_, address_, options), shared_from_this()};
 }
 
+Host::CreateConnectionData HostImpl::createHealthCheckConnection(
+    Event::Dispatcher& dispatcher,
+    const Network::ConnectionSocket::OptionsSharedPtr& options) const {
+  return {createConnection(dispatcher, *cluster_, healthCheckAddress(), options),
+          shared_from_this()};
+}
+
 Network::ClientConnectionPtr
 HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& cluster,
                            Network::Address::InstanceConstSharedPtr address,
@@ -813,6 +820,13 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
         parent_.onPreInitComplete();
         resolve_timer_->enableTimer(parent_.dns_refresh_rate_ms_);
       });
+}
+
+Network::Address::InstanceConstSharedPtr HostDescriptionImpl::healthCheckAddress() const {
+  if (alt_hc_port_ == 0) {
+    return address_;
+  }
+  return Network::Utility::getAddressWithPort(*address_, alt_hc_port_);
 }
 
 } // namespace Upstream

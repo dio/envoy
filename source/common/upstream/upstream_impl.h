@@ -55,14 +55,14 @@ public:
   HostDescriptionImpl(ClusterInfoConstSharedPtr cluster, const std::string& hostname,
                       Network::Address::InstanceConstSharedPtr dest_address,
                       const envoy::api::v2::core::Metadata& metadata,
-                      const envoy::api::v2::core::Locality& locality)
+                      const envoy::api::v2::core::Locality& locality, uint32_t alt_hc_port = 0)
       : cluster_(cluster), hostname_(hostname), address_(dest_address),
         canary_(Config::Metadata::metadataValue(metadata, Config::MetadataFilters::get().ENVOY_LB,
                                                 Config::MetadataEnvoyLbKeys::get().CANARY)
                     .bool_value()),
         metadata_(metadata), locality_(locality), stats_{ALL_HOST_STATS(POOL_COUNTER(stats_store_),
-                                                                        POOL_GAUGE(stats_store_))} {
-  }
+                                                                        POOL_GAUGE(stats_store_))},
+        alt_hc_port_(alt_hc_port) {}
 
   // Upstream::HostDescription
   bool canary() const override { return canary_; }
@@ -90,6 +90,7 @@ public:
   const std::string& hostname() const override { return hostname_; }
   Network::Address::InstanceConstSharedPtr address() const override { return address_; }
   const envoy::api::v2::core::Locality& locality() const override { return locality_; }
+  Network::Address::InstanceConstSharedPtr healthCheckAddress() const override;
 
 protected:
   ClusterInfoConstSharedPtr cluster_;
@@ -102,6 +103,7 @@ protected:
   HostStats stats_;
   Outlier::DetectorHostMonitorPtr outlier_detector_;
   HealthCheckHostMonitorPtr health_checker_;
+  uint32_t alt_hc_port_;
 };
 
 /**
@@ -114,8 +116,9 @@ public:
   HostImpl(ClusterInfoConstSharedPtr cluster, const std::string& hostname,
            Network::Address::InstanceConstSharedPtr address,
            const envoy::api::v2::core::Metadata& metadata, uint32_t initial_weight,
-           const envoy::api::v2::core::Locality& locality)
-      : HostDescriptionImpl(cluster, hostname, address, metadata, locality), used_(true) {
+           const envoy::api::v2::core::Locality& locality, uint32_t alt_hc_port = 0)
+      : HostDescriptionImpl(cluster, hostname, address, metadata, locality, alt_hc_port),
+        used_(true) {
     weight(initial_weight);
   }
 
@@ -124,6 +127,9 @@ public:
   CreateConnectionData
   createConnection(Event::Dispatcher& dispatcher,
                    const Network::ConnectionSocket::OptionsSharedPtr& options) const override;
+  CreateConnectionData createHealthCheckConnection(
+      Event::Dispatcher& dispatcher,
+      const Network::ConnectionSocket::OptionsSharedPtr& options) const override;
   std::list<Stats::GaugeSharedPtr> gauges() const override { return stats_store_.gauges(); }
   void healthFlagClear(HealthFlag flag) override { health_flags_ &= ~enumToInt(flag); }
   bool healthFlagGet(HealthFlag flag) const override { return health_flags_ & enumToInt(flag); }

@@ -80,9 +80,10 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
           locality_lb_endpoint.load_balancing_weight().value();
     }
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
-      priority_state[priority].first->emplace_back(new HostImpl(
-          info_, "", resolveProtoAddress(lb_endpoint.endpoint().address()), lb_endpoint.metadata(),
-          lb_endpoint.load_balancing_weight().value(), locality_lb_endpoint.locality()));
+      priority_state[priority].first->emplace_back(
+          new HostImpl(info_, "", resolveProtoAddress(lb_endpoint.endpoint().address()),
+                       lb_endpoint.metadata(), lb_endpoint.load_balancing_weight().value(),
+                       locality_lb_endpoint.locality(), lb_endpoint.endpoint().alt_hc_port()));
     }
   }
 
