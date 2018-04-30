@@ -158,6 +158,7 @@ message Cluster {
   // then hosts is required.
   repeated core.Address hosts = 7;
 
+  // [#not-implemented-hide:]
   message Endpoint {
     oneof endpoint_specifier {
       option (validate.required) = true;
@@ -166,6 +167,8 @@ message Cluster {
     }
   }
 
+  // [#not-implemented-hide:]
+  // To accomodate custom health check config.
   repeated Endpoint endpoints = 31;
 
   // Optional :ref:`active health checking <arch_overview_health_checking>`
