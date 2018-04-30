@@ -13,6 +13,7 @@ import "envoy/api/v2/core/health_check.proto";
 import "envoy/api/v2/core/protocol.proto";
 import "envoy/api/v2/cluster/circuit_breaker.proto";
 import "envoy/api/v2/cluster/outlier_detection.proto";
+import "envoy/api/v2/endpoint/endpoint.proto";
 import "envoy/type/percent.proto";
 
 import "google/api/annotations.proto";
@@ -156,6 +157,16 @@ message Cluster {
   // or :ref:`LOGICAL_DNS<envoy_api_enum_value_Cluster.DiscoveryType.LOGICAL_DNS>`,
   // then hosts is required.
   repeated core.Address hosts = 7;
+
+  message Endpoint {
+    oneof endpoint_specifier {
+      option (validate.required) = true;
+      core.Address address = 1;
+      endpoint.Endpoint endpoint = 2;
+    }
+  }
+
+  repeated Endpoint endpoints = 31;
 
   // Optional :ref:`active health checking <arch_overview_health_checking>`
   // configuration for the cluster. If no
