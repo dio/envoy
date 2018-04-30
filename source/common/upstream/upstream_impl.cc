@@ -625,11 +625,25 @@ StaticClusterImpl::StaticClusterImpl(const envoy::api::v2::Cluster& cluster,
     : ClusterImplBase(cluster, cm.bindConfig(), runtime, stats, ssl_context_manager, added_via_api),
       initial_hosts_(new HostVector()) {
 
-  for (const auto& host : cluster.hosts()) {
-    initial_hosts_->emplace_back(HostSharedPtr{new HostImpl(
-        info_, "", resolveProtoAddress(host), envoy::api::v2::core::Metadata::default_instance(), 1,
-        envoy::api::v2::core::Locality().default_instance(),
-        envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance())});
+  if (cluster.endpoints().empty()) {
+    for (const auto& host : cluster.hosts()) {
+      initial_hosts_->emplace_back(HostSharedPtr{new HostImpl(
+          info_, "", resolveProtoAddress(host), envoy::api::v2::core::Metadata::default_instance(),
+          1, envoy::api::v2::core::Locality().default_instance(),
+          envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance())});
+    }
+  } else {
+    for (const auto& endpoint : cluster.endpoints()) {
+      initial_hosts_->emplace_back(HostSharedPtr{new HostImpl(
+          info_, "",
+          resolveProtoAddress(endpoint.has_endpoint() ? endpoint.endpoint().address()
+                                                      : endpoint.address()),
+          envoy::api::v2::core::Metadata::default_instance(), 1,
+          envoy::api::v2::core::Locality().default_instance(),
+          endpoint.has_endpoint()
+              ? endpoint.endpoint().health_check_config()
+              : envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance())});
+    }
   }
 }
 
@@ -791,11 +805,28 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(const envoy::api::v2::Cluster& cluste
     NOT_REACHED;
   }
 
-  for (const auto& host : cluster.hosts()) {
-    resolve_targets_.emplace_back(
-        new ResolveTarget(*this, dispatcher,
-                          fmt::format("tcp://{}:{}", host.socket_address().address(),
-                                      host.socket_address().port_value())));
+  if (cluster.endpoints().empty()) {
+    for (const auto& host : cluster.hosts()) {
+      resolve_targets_.emplace_back(new ResolveTarget(
+          *this, dispatcher,
+          fmt::format("tcp://{}:{}", host.socket_address().address(),
+                      host.socket_address().port_value()),
+          envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance()));
+    }
+  } else {
+    for (const auto& endpoint : cluster.endpoints()) {
+      resolve_targets_.emplace_back(new ResolveTarget(
+          *this, dispatcher,
+          fmt::format(
+              "tcp://{}:{}",
+              endpoint.has_endpoint() ? endpoint.endpoint().address().socket_address().address()
+                                      : endpoint.address().socket_address().address(),
+              endpoint.has_endpoint() ? endpoint.endpoint().address().socket_address().port_value()
+                                      : endpoint.address().socket_address().port_value()),
+          endpoint.has_endpoint()
+              ? endpoint.endpoint().health_check_config()
+              : envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance()));
+    }
   }
 }
 
@@ -823,12 +854,13 @@ void StrictDnsClusterImpl::updateAllHosts(const HostVector& hosts_added,
                              hosts_added, hosts_removed);
 }
 
-StrictDnsClusterImpl::ResolveTarget::ResolveTarget(StrictDnsClusterImpl& parent,
-                                                   Event::Dispatcher& dispatcher,
-                                                   const std::string& url)
+StrictDnsClusterImpl::ResolveTarget::ResolveTarget(
+    StrictDnsClusterImpl& parent, Event::Dispatcher& dispatcher, const std::string& url,
+    const envoy::api::v2::endpoint::Endpoint::HealthCheckConfig& health_check_config)
     : parent_(parent), dns_address_(Network::Utility::hostFromTcpUrl(url)),
       port_(Network::Utility::portFromTcpUrl(url)),
-      resolve_timer_(dispatcher.createTimer([this]() -> void { startResolve(); })) {}
+      resolve_timer_(dispatcher.createTimer([this]() -> void { startResolve(); })),
+      health_check_config_(health_check_config) {}
 
 StrictDnsClusterImpl::ResolveTarget::~ResolveTarget() {
   if (active_query_) {
@@ -856,8 +888,7 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
           new_hosts.emplace_back(new HostImpl(
               parent_.info_, dns_address_, Network::Utility::getAddressWithPort(*address, port_),
               envoy::api::v2::core::Metadata::default_instance(), 1,
-              envoy::api::v2::core::Locality().default_instance(),
-              envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance()));
+              envoy::api::v2::core::Locality().default_instance(), health_check_config_));
         }
 
         HostVector hosts_added;
