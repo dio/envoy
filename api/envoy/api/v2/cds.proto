@@ -158,7 +158,6 @@ message Cluster {
   // then hosts is required.
   repeated core.Address hosts = 7;
 
-  // [#not-implemented-hide:]
   // Setting this instead of :ref:`hosts<envoy_api_field_Cluster.hosts>` allows specifying
   // optional :ref:`health check config<envoy_api_msg_endpoint.Endpoint.HealthCheckConfig>`
   // per cluster member for cluster with discovery type
