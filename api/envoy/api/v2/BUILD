@@ -69,7 +69,7 @@ api_proto_library(
         "//envoy/api/v2/core:config_source",
         "//envoy/api/v2/core:health_check",
         "//envoy/api/v2/core:protocol",
-        "//envoy/api/v2/endpoint:endpoint",
+        "//envoy/api/v2/endpoint",
         "//envoy/type:percent",
     ],
 )
