@@ -403,6 +403,11 @@ private:
   const bool drain_connections_on_host_removal_;
 };
 
+typedef std::unordered_map<envoy::api::v2::core::Locality, uint32_t, LocalityHash, LocalityEqualTo>
+    LocalityWeightsMap;
+typedef std::unique_ptr<HostVector> HostListPtr;
+typedef std::vector<std::pair<HostListPtr, LocalityWeightsMap>> PriorityState;
+
 /**
  * Base class all primary clusters.
  */
@@ -471,15 +476,18 @@ protected:
    */
   void onPreInitComplete();
 
+  void
+  initializePriorityState(const envoy::api::v2::ClusterLoadAssignment& cluster_load_assignment);
+
   Runtime::Loader& runtime_;
-  ClusterInfoConstSharedPtr
-      info_; // This cluster info stores the stats scope so it must be initialized first
-             // and destroyed last.
+  ClusterInfoConstSharedPtr info_; // This cluster info stores the stats scope so it must be
+                                   // initialized first and destroyed last.
   HealthCheckerSharedPtr health_checker_;
   Outlier::DetectorSharedPtr outlier_detector_;
 
 protected:
   PrioritySetImpl priority_set_;
+  PriorityState priority_state_;
 
 private:
   void finishInitialization();
@@ -498,7 +506,7 @@ class StaticClusterImpl : public ClusterImplBase {
 public:
   StaticClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
                     Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
-                    ClusterManager& cm, bool added_via_api);
+                    const LocalInfo::LocalInfo& local_info, ClusterManager& cm, bool added_via_api);
 
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
@@ -506,8 +514,7 @@ public:
 private:
   // ClusterImplBase
   void startPreInit() override;
-
-  HostVectorSharedPtr initial_hosts_;
+  const LocalInfo::LocalInfo& local_info_;
 };
 
 /**
