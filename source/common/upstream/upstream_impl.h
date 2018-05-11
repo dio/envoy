@@ -536,6 +536,7 @@ class StrictDnsClusterImpl : public BaseDynamicClusterImpl {
 public:
   StrictDnsClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
                        Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
+                       const LocalInfo::LocalInfo& local_info,
                        Network::DnsResolverSharedPtr dns_resolver, ClusterManager& cm,
                        Event::Dispatcher& dispatcher, bool added_via_api);
 
@@ -543,9 +544,28 @@ public:
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
 
 private:
+  struct ResolveTargetContext {
+    ResolveTargetContext(const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoints,
+                         const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint)
+        : priority_(locality_lb_endpoints.priority()), metadata_(lb_endpoint.metadata()),
+          weight_(lb_endpoint.load_balancing_weight().value() < 1
+                      ? 1
+                      : lb_endpoint.load_balancing_weight().value()),
+          locality_(locality_lb_endpoints.locality()),
+          health_check_config_(lb_endpoint.endpoint().health_check_config()) {}
+
+    const uint32_t priority_;
+    const envoy::api::v2::core::Metadata metadata_;
+    const uint32_t weight_;
+    const envoy::api::v2::core::Locality locality_;
+    const envoy::api::v2::endpoint::Endpoint::HealthCheckConfig health_check_config_;
+  };
+
+  typedef std::shared_ptr<ResolveTargetContext> ResolveTargetContextSharedPtr;
+
   struct ResolveTarget {
     ResolveTarget(StrictDnsClusterImpl& parent, Event::Dispatcher& dispatcher,
-                  const std::string& url);
+                  const std::string& url, ResolveTargetContext& context);
     ~ResolveTarget();
     void startResolve();
 
@@ -555,6 +575,7 @@ private:
     uint32_t port_;
     Event::TimerPtr resolve_timer_;
     HostVector hosts_;
+    const ResolveTargetContext context_;
   };
 
   typedef std::unique_ptr<ResolveTarget> ResolveTargetPtr;
@@ -568,6 +589,7 @@ private:
   std::list<ResolveTargetPtr> resolve_targets_;
   const std::chrono::milliseconds dns_refresh_rate_ms_;
   Network::DnsLookupFamily dns_lookup_family_;
+  const LocalInfo::LocalInfo& local_info_;
 };
 
 } // namespace Upstream

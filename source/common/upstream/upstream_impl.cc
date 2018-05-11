@@ -38,20 +38,6 @@ namespace Envoy {
 namespace Upstream {
 namespace {
 
-const envoy::api::v2::ClusterLoadAssignment
-translateClusterHosts(const Protobuf::RepeatedPtrField<envoy::api::v2::core::Address>& hosts) {
-  envoy::api::v2::ClusterLoadAssignment load_assignment;
-  envoy::api::v2::endpoint::LocalityLbEndpoints* locality_lb_endpoints =
-      load_assignment.add_endpoints();
-
-  for (const envoy::api::v2::core::Address& host : hosts) {
-    envoy::api::v2::endpoint::LbEndpoint* lb_endpoint = locality_lb_endpoints->add_lb_endpoints();
-    lb_endpoint->mutable_endpoint()->mutable_address()->CopyFrom(host);
-  }
-
-  return load_assignment;
-}
-
 const Network::Address::InstanceConstSharedPtr
 getSourceAddress(const envoy::api::v2::Cluster& cluster,
                  const envoy::api::v2::core::BindConfig& bind_config) {
@@ -382,7 +368,7 @@ ClusterSharedPtr ClusterImplBase::create(const envoy::api::v2::Cluster& cluster,
     break;
   case envoy::api::v2::Cluster::STRICT_DNS:
     new_cluster.reset(new StrictDnsClusterImpl(cluster, runtime, stats, ssl_context_manager,
-                                               selected_dns_resolver, cm, dispatcher,
+                                               local_info, selected_dns_resolver, cm, dispatcher,
                                                added_via_api));
     break;
   case envoy::api::v2::Cluster::LOGICAL_DNS:
@@ -524,6 +510,7 @@ void ClusterImplBase::initializePriorityState(
       priority_state_[priority].second[locality_lb_endpoint.locality()] =
           locality_lb_endpoint.load_balancing_weight().value();
     }
+    // TODO(dio): defer this
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
       priority_state_[priority].first->emplace_back(new HostImpl(
           info_, EMPTY_STRING, resolveProtoAddress(lb_endpoint.endpoint().address()),
@@ -666,8 +653,9 @@ StaticClusterImpl::StaticClusterImpl(const envoy::api::v2::Cluster& cluster,
                                      bool added_via_api)
     : ClusterImplBase(cluster, cm.bindConfig(), runtime, stats, ssl_context_manager, added_via_api),
       local_info_(local_info) {
-  initializePriorityState(cluster.has_load_assignment() ? cluster.load_assignment()
-                                                        : translateClusterHosts(cluster.hosts()));
+  initializePriorityState(cluster.has_load_assignment()
+                              ? cluster.load_assignment()
+                              : Config::Utility::translateClusterHosts(cluster.hosts()));
 }
 
 void StaticClusterImpl::startPreInit() {
@@ -861,6 +849,7 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
 StrictDnsClusterImpl::StrictDnsClusterImpl(const envoy::api::v2::Cluster& cluster,
                                            Runtime::Loader& runtime, Stats::Store& stats,
                                            Ssl::ContextManager& ssl_context_manager,
+                                           const LocalInfo::LocalInfo& local_info,
                                            Network::DnsResolverSharedPtr dns_resolver,
                                            ClusterManager& cm, Event::Dispatcher& dispatcher,
                                            bool added_via_api)
@@ -868,7 +857,8 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(const envoy::api::v2::Cluster& cluste
                              added_via_api),
       dns_resolver_(dns_resolver),
       dns_refresh_rate_ms_(
-          std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_refresh_rate, 5000))) {
+          std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_refresh_rate, 5000))),
+      local_info_(local_info) {
   switch (cluster.dns_lookup_family()) {
   case envoy::api::v2::Cluster::V6_ONLY:
     dns_lookup_family_ = Network::DnsLookupFamily::V6Only;
@@ -883,11 +873,29 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(const envoy::api::v2::Cluster& cluste
     NOT_REACHED;
   }
 
-  for (const auto& host : cluster.hosts()) {
-    resolve_targets_.emplace_back(
-        new ResolveTarget(*this, dispatcher,
-                          fmt::format("tcp://{}:{}", host.socket_address().address(),
-                                      host.socket_address().port_value())));
+  const auto& load_assignment = cluster.has_load_assignment()
+                                    ? cluster.load_assignment()
+                                    : Config::Utility::translateClusterHosts(cluster.hosts());
+
+  for (const auto& locality_lb_endpoints : load_assignment.endpoints()) {
+    for (const auto& lb_endpoint : locality_lb_endpoints.lb_endpoints()) {
+      const auto& host = lb_endpoint.endpoint().address();
+      const std::string& url = fmt::format("tcp://{}:{}", host.socket_address().address(),
+                                           host.socket_address().port_value());
+      ResolveTargetContextSharedPtr context(
+          std::make_shared<ResolveTargetContext>(locality_lb_endpoints, lb_endpoint));
+      resolve_targets_.emplace_back(new ResolveTarget(*this, dispatcher, url, *context));
+    }
+
+    // Initialize the priority state.
+    const uint32_t priority = locality_lb_endpoints.priority();
+    if (priority_state_.size() <= priority) {
+      priority_state_.resize(priority + 1);
+    }
+    if (locality_lb_endpoints.has_locality() && locality_lb_endpoints.has_load_balancing_weight()) {
+      priority_state_[priority].second[locality_lb_endpoints.locality()] =
+          locality_lb_endpoints.load_balancing_weight().value();
+    }
   }
 }
 
@@ -899,28 +907,34 @@ void StrictDnsClusterImpl::startPreInit() {
 
 void StrictDnsClusterImpl::updateAllHosts(const HostVector& hosts_added,
                                           const HostVector& hosts_removed) {
+
+  const auto& local_locality = local_info_.node().locality();
+  ENVOY_LOG(trace, "Local locality: {}", local_locality.DebugString());
+
   // At this point we know that we are different so make a new host list and notify.
   HostVectorSharedPtr new_hosts(new HostVector());
   for (const ResolveTargetPtr& target : resolve_targets_) {
+    const uint32_t priority = target->context_.priority_;
     for (const HostSharedPtr& host : target->hosts_) {
       new_hosts->emplace_back(host);
     }
-  }
 
-  // Given the current config, only EDS clusters support multiple priorities.
-  ASSERT(priority_set_.hostSetsPerPriority().size() == 1);
-  auto& first_host_set = priority_set_.getOrCreateHostSet(0);
-  first_host_set.updateHosts(new_hosts, createHealthyHostList(*new_hosts),
-                             HostsPerLocalityImpl::empty(), HostsPerLocalityImpl::empty(), {},
-                             hosts_added, hosts_removed);
+    // TODO(dio): build per locality shared its corresponding healthy hosts.
+    auto& host_set = priority_set_.getOrCreateHostSet(priority);
+    host_set.updateHosts(new_hosts, createHealthyHostList(*new_hosts),
+                         HostsPerLocalityImpl::empty(), HostsPerLocalityImpl::empty(), {},
+                         hosts_added, hosts_removed);
+  }
 }
 
 StrictDnsClusterImpl::ResolveTarget::ResolveTarget(StrictDnsClusterImpl& parent,
                                                    Event::Dispatcher& dispatcher,
-                                                   const std::string& url)
+                                                   const std::string& url,
+                                                   ResolveTargetContext& context)
     : parent_(parent), dns_address_(Network::Utility::hostFromTcpUrl(url)),
       port_(Network::Utility::portFromTcpUrl(url)),
-      resolve_timer_(dispatcher.createTimer([this]() -> void { startResolve(); })) {}
+      resolve_timer_(dispatcher.createTimer([this]() -> void { startResolve(); })),
+      context_(context) {}
 
 StrictDnsClusterImpl::ResolveTarget::~ResolveTarget() {
   if (active_query_) {
@@ -945,17 +959,18 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
           // a new address that has port in it. We need to both support IPv6 as well as potentially
           // move port handling into the DNS interface itself, which would work better for SRV.
           ASSERT(address != nullptr);
-          new_hosts.emplace_back(new HostImpl(
-              parent_.info_, dns_address_, Network::Utility::getAddressWithPort(*address, port_),
-              envoy::api::v2::core::Metadata::default_instance(), 1,
-              envoy::api::v2::core::Locality().default_instance(),
-              envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance()));
+          new_hosts.emplace_back(new HostImpl(parent_.info_, dns_address_,
+                                              Network::Utility::getAddressWithPort(*address, port_),
+                                              context_.metadata_, context_.weight_,
+                                              context_.locality_, context_.health_check_config_));
         }
 
         HostVector hosts_added;
         HostVector hosts_removed;
         if (parent_.updateDynamicHostList(new_hosts, hosts_, hosts_added, hosts_removed)) {
           ENVOY_LOG(debug, "DNS hosts have changed for {}", dns_address_);
+          // TODO(dio): consider weights here.
+          // get context_.priority_;
           parent_.updateAllHosts(hosts_added, hosts_removed);
         }
 

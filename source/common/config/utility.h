@@ -284,6 +284,9 @@ public:
   factoryForGrpcApiConfigSource(Grpc::AsyncClientManager& async_client_manager,
                                 const envoy::api::v2::core::ApiConfigSource& api_config_source,
                                 Stats::Scope& scope);
+
+  const static envoy::api::v2::ClusterLoadAssignment
+  translateClusterHosts(const Protobuf::RepeatedPtrField<envoy::api::v2::core::Address>& hosts);
 };
 
 } // namespace Config

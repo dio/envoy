@@ -27,9 +27,14 @@ LogicalDnsCluster::LogicalDnsCluster(const envoy::api::v2::Cluster& cluster,
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_refresh_rate, 5000))),
       tls_(tls.allocateSlot()),
       resolve_timer_(dispatcher.createTimer([this]() -> void { startResolve(); })) {
-  const auto& hosts = cluster.hosts();
-  if (hosts.size() != 1) {
-    throw EnvoyException("logical_dns clusters must have a single host");
+
+  const auto& load_assignment = cluster.has_load_assignment()
+                                    ? cluster.load_assignment()
+                                    : Config::Utility::translateClusterHosts(cluster.hosts());
+  // TODO(dio): write the type explicitly.
+  const auto& endpoints = load_assignment.endpoints();
+  if (endpoints.size() != 1 || endpoints[0].lb_endpoints().size() != 1) {
+    throw EnvoyException("logical_dns clusters must have a single endpoints");
   }
 
   switch (cluster.dns_lookup_family()) {
@@ -46,10 +51,13 @@ LogicalDnsCluster::LogicalDnsCluster(const envoy::api::v2::Cluster& cluster,
     NOT_REACHED;
   }
 
-  const auto& socket_address = hosts[0].socket_address();
+  const envoy::api::v2::endpoint::Endpoint& endpoint = endpoints[0].lb_endpoints()[0].endpoint();
+  const envoy::api::v2::core::SocketAddress& socket_address = endpoint.address().socket_address();
   dns_url_ = fmt::format("tcp://{}:{}", socket_address.address(), socket_address.port_value());
   hostname_ = Network::Utility::hostFromTcpUrl(dns_url_);
   Network::Utility::portFromTcpUrl(dns_url_);
+
+  health_check_config_ = endpoint.health_check_config();
 
   tls_->set([](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<PerThreadCurrentHostData>();
@@ -87,7 +95,10 @@ void LogicalDnsCluster::startResolve() {
             current_resolved_address_ = new_address;
             // Capture URL to avoid a race with another update.
             tls_->runOnAllThreads([this, new_address]() -> void {
-              tls_->getTyped<PerThreadCurrentHostData>().current_resolved_address_ = new_address;
+              PerThreadCurrentHostData& data = tls_->getTyped<PerThreadCurrentHostData>();
+
+              data.current_resolved_address_ = new_address;
+              data.health_check_config_ = health_check_config_;
             });
           }
 
@@ -129,8 +140,8 @@ Upstream::Host::CreateConnectionData LogicalDnsCluster::LogicalHost::createConne
   ASSERT(data.current_resolved_address_);
   return {HostImpl::createConnection(dispatcher, *parent_.info_, data.current_resolved_address_,
                                      options),
-          HostDescriptionConstSharedPtr{
-              new RealHostDescription(data.current_resolved_address_, shared_from_this())}};
+          HostDescriptionConstSharedPtr{new RealHostDescription(
+              data.current_resolved_address_, data.health_check_config_, shared_from_this())}};
 }
 
 } // namespace Upstream

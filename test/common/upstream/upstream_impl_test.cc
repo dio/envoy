@@ -27,6 +27,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::AtLeast;
 using testing::ContainerEq;
 using testing::Invoke;
 using testing::NiceMock;
@@ -107,6 +108,8 @@ TEST_P(StrictDnsParamTest, ImmediateResolve) {
   auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
   NiceMock<Event::MockDispatcher> dispatcher;
   NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
+  local_info.node_.mutable_locality()->set_zone("us-east-1a");
   ReadyWatcher initialized;
 
   const std::string json = R"EOF(
@@ -129,7 +132,7 @@ TEST_P(StrictDnsParamTest, ImmediateResolve) {
       }));
   NiceMock<MockClusterManager> cm;
   StrictDnsClusterImpl cluster(parseClusterFromJson(json), runtime, stats, ssl_context_manager,
-                               dns_resolver, cm, dispatcher, false);
+                               local_info, dns_resolver, cm, dispatcher, false);
   cluster.initialize([&]() -> void { initialized.ready(); });
   EXPECT_EQ(2UL, cluster.prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(2UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
@@ -143,6 +146,8 @@ TEST(StrictDnsClusterImplTest, ZeroHostsHealthChecker) {
   NiceMock<Event::MockDispatcher> dispatcher;
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<MockClusterManager> cm;
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
+  local_info.node_.mutable_locality()->set_zone("us-east-1a");
   ReadyWatcher initialized;
 
   const std::string yaml = R"EOF(
@@ -155,7 +160,7 @@ TEST(StrictDnsClusterImplTest, ZeroHostsHealthChecker) {
 
   ResolverData resolver(*dns_resolver, dispatcher);
   StrictDnsClusterImpl cluster(parseClusterFromV2Yaml(yaml), runtime, stats, ssl_context_manager,
-                               dns_resolver, cm, dispatcher, false);
+                               local_info, dns_resolver, cm, dispatcher, false);
   std::shared_ptr<MockHealthChecker> health_checker(new MockHealthChecker());
   EXPECT_CALL(*health_checker, start());
   EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_));
@@ -176,6 +181,8 @@ TEST(StrictDnsClusterImplTest, Basic) {
   auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
   NiceMock<Event::MockDispatcher> dispatcher;
   NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
+  local_info.node_.mutable_locality()->set_zone("us-east-1a");
 
   // gmock matches in LIFO order which is why these are swapped.
   ResolverData resolver2(*dns_resolver, dispatcher);
@@ -213,7 +220,7 @@ TEST(StrictDnsClusterImplTest, Basic) {
 
   NiceMock<MockClusterManager> cm;
   StrictDnsClusterImpl cluster(parseClusterFromJson(json), runtime, stats, ssl_context_manager,
-                               dns_resolver, cm, dispatcher, false);
+                               local_info, dns_resolver, cm, dispatcher, false);
   EXPECT_CALL(runtime.snapshot_, getInteger("circuit_breakers.name.default.max_connections", 43));
   EXPECT_EQ(43U, cluster.info()->resourceManager(ResourcePriority::Default).connections().max());
   EXPECT_CALL(runtime.snapshot_,
@@ -249,7 +256,7 @@ TEST(StrictDnsClusterImplTest, Basic) {
 
   resolver1.expectResolve(*dns_resolver);
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000)));
-  EXPECT_CALL(membership_updated, ready());
+  EXPECT_CALL(membership_updated, ready()).Times(AtLeast(1));
   resolver1.dns_callback_(TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
   EXPECT_THAT(
       std::list<std::string>({"127.0.0.1:11001", "127.0.0.2:11001"}),
@@ -275,7 +282,7 @@ TEST(StrictDnsClusterImplTest, Basic) {
 
   resolver1.timer_->callback_();
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000)));
-  EXPECT_CALL(membership_updated, ready());
+  EXPECT_CALL(membership_updated, ready()).Times(AtLeast(1));
   resolver1.dns_callback_(TestUtility::makeDnsResponse({"127.0.0.3"}));
   EXPECT_THAT(
       std::list<std::string>({"127.0.0.3:11001"}),
@@ -283,7 +290,7 @@ TEST(StrictDnsClusterImplTest, Basic) {
 
   // Make sure we de-dup the same address.
   EXPECT_CALL(*resolver2.timer_, enableTimer(std::chrono::milliseconds(4000)));
-  EXPECT_CALL(membership_updated, ready());
+  EXPECT_CALL(membership_updated, ready()).Times(AtLeast(1));
   resolver2.dns_callback_(TestUtility::makeDnsResponse({"10.0.0.1", "10.0.0.1"}));
   EXPECT_THAT(
       std::list<std::string>({"127.0.0.3:11001", "10.0.0.1:11002"}),
@@ -317,6 +324,8 @@ TEST(StrictDnsClusterImplTest, HostRemovalActiveHealthSkipped) {
   NiceMock<Event::MockDispatcher> dispatcher;
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<MockClusterManager> cm;
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
+  local_info.node_.mutable_locality()->set_zone("us-east-1a");
 
   const std::string yaml = R"EOF(
     name: name
@@ -329,7 +338,7 @@ TEST(StrictDnsClusterImplTest, HostRemovalActiveHealthSkipped) {
 
   ResolverData resolver(*dns_resolver, dispatcher);
   StrictDnsClusterImpl cluster(parseClusterFromV2Yaml(yaml), runtime, stats, ssl_context_manager,
-                               dns_resolver, cm, dispatcher, false);
+                               local_info, dns_resolver, cm, dispatcher, false);
   std::shared_ptr<MockHealthChecker> health_checker(new MockHealthChecker());
   EXPECT_CALL(*health_checker, start());
   EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_));
@@ -784,6 +793,8 @@ TEST(ClusterImplTest, CloseConnectionsOnHostHealthFailure) {
   NiceMock<Event::MockDispatcher> dispatcher;
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<MockClusterManager> cm;
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
+  local_info.node_.mutable_locality()->set_zone("us-east-1a");
   ReadyWatcher initialized;
 
   const std::string yaml = R"EOF(
@@ -795,7 +806,7 @@ TEST(ClusterImplTest, CloseConnectionsOnHostHealthFailure) {
     hosts: [{ socket_address: { address: foo.bar.com, port_value: 443 }}]
   )EOF";
   StrictDnsClusterImpl cluster(parseClusterFromV2Yaml(yaml), runtime, stats, ssl_context_manager,
-                               dns_resolver, cm, dispatcher, false);
+                               local_info, dns_resolver, cm, dispatcher, false);
   EXPECT_TRUE(cluster.info()->features() &
               ClusterInfo::Features::CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE);
 }
@@ -857,6 +868,8 @@ TEST(ClusterMetadataTest, Metadata) {
   NiceMock<Event::MockDispatcher> dispatcher;
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<MockClusterManager> cm;
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
+  local_info.node_.mutable_locality()->set_zone("us-east-1a");
   ReadyWatcher initialized;
 
   const std::string yaml = R"EOF(
@@ -872,7 +885,7 @@ TEST(ClusterMetadataTest, Metadata) {
   )EOF";
 
   StrictDnsClusterImpl cluster(parseClusterFromV2Yaml(yaml), runtime, stats, ssl_context_manager,
-                               dns_resolver, cm, dispatcher, false);
+                               local_info, dns_resolver, cm, dispatcher, false);
   EXPECT_EQ("test_value",
             Config::Metadata::metadataValue(cluster.info()->metadata(), "com.bar.foo", "baz")
                 .string_value());
