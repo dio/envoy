@@ -34,7 +34,7 @@ public:
   /**
    * @return std::string representing the GMT/UTC time based on the input time.
    */
-  std::string fromTime(const SystemTime& time) const;
+  std::string fromTime(const SystemTime& time, const bool use_regex = true) const;
 
   /**
    * @return std::string representing the GMT/UTC time based on the input time.
@@ -52,14 +52,11 @@ public:
   const std::string& formatString() const { return format_string_; }
 
 private:
-  std::string fromTime(time_t time, const std::string& new_format_string) const;
+  std::string fromTime(time_t time, absl::string_view new_format_string) const;
   std::string setCustomField(const std::string& field, const std::string& value) const;
+  std::string setCustomFieldRegex(const std::regex& field, const std::string& value) const;
 
-  struct CustomFields {
-    static const std::string& f() { CONSTRUCT_ON_FIRST_USE(std::string, "f"); }
-  };
-
-  std::string format_string_;
+  const std::string format_string_;
 };
 
 /**

@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstdint>
 #include <iterator>
+#include <regex>
 #include <string>
 
 #include "envoy/common/exception.h"
@@ -13,6 +14,7 @@
 #include "common/common/empty_string.h"
 #include "common/common/fmt.h"
 #include "common/common/hash.h"
+#include "common/singleton/const_singleton.h"
 
 #include "absl/strings/ascii.h"
 #include "absl/strings/match.h"
@@ -21,16 +23,27 @@
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
+namespace {
 
-std::string DateFormatter::fromTime(const SystemTime& time) const {
-  const std::string new_format_string = setCustomField(
-      // "%f" is the custom field for subsecond.
-      CustomFields::f(),
+class CustomFieldValues {
+public:
+  const std::string SUBSECOND{"f"};
+  const std::regex SUBSECOND_PATTERN{"%([1-9])?f"};
+};
+
+typedef ConstSingleton<CustomFieldValues> CustomFieldNames;
+
+} // namespace
+
+std::string DateFormatter::fromTime(const SystemTime& time, const bool use_regex) const {
+  const std::string subsecond_str =
       fmt::FormatInt(
-          // By default we want nanoseconds.
           std::chrono::duration_cast<std::chrono::nanoseconds>(time.time_since_epoch()).count())
           .str()
-          .substr(10));
+          .substr(10);
+  absl::string_view new_format_string =
+      use_regex ? setCustomFieldRegex(CustomFieldNames::get().SUBSECOND_PATTERN, subsecond_str)
+                : setCustomField(CustomFieldNames::get().SUBSECOND, subsecond_str);
 
   const time_t current_time = std::chrono::system_clock::to_time_t(time);
   if (new_format_string.empty()) {
@@ -41,12 +54,12 @@ std::string DateFormatter::fromTime(const SystemTime& time) const {
   return fromTime(current_time, new_format_string);
 }
 
-std::string DateFormatter::fromTime(time_t time, const std::string& new_format_string) const {
+std::string DateFormatter::fromTime(time_t time, absl::string_view new_format_string) const {
   tm current_tm;
   gmtime_r(&time, &current_tm);
 
   std::array<char, 1024> buf;
-  strftime(&buf[0], buf.size(), new_format_string.c_str(), &current_tm);
+  strftime(&buf[0], buf.size(), new_format_string.data(), &current_tm);
   return std::string(&buf[0]);
 }
 
@@ -67,21 +80,21 @@ std::string DateFormatter::setCustomField(const std::string& field,
 
     size_t start = found - 1;
     if (start < new_format_string.size()) {
-      std::string sub = new_format_string.substr(start, 2);
-      if (sub.at(0) == '%' && sub.size() == 2) {
-        // This field definitely has no width specifier, e.g. %f.
-        new_format_string = new_format_string.replace(start, 2, value);
+      absl::string_view sub = new_format_string.substr(start, 2);
+      if (sub.front() == '%' && sub.size() == 2) {
+        // This field definitely has no width specifier, i.e. %f.
+        new_format_string.replace(start, 2, value);
       } else {
         start = found - 2;
 
         // This field potentially has a valid width specifier, e.g. %3f.
         if (start < new_format_string.size()) {
-          std::string sub = new_format_string.substr(start, 2);
+          absl::string_view sub = new_format_string.substr(start, 2);
 
-          if (sub.at(0) == '%' && sub.size() == 2) {
+          if (sub.front() == '%' && sub.size() == 2) {
             uint64_t width;
-            if (StringUtil::atoul(sub.substr(1, 1).c_str(), width)) {
-              new_format_string = new_format_string.replace(start, 3, value.substr(0, width));
+            if (StringUtil::atoul(sub.substr(1, 1).data(), width)) {
+              new_format_string.replace(start, 3, value.substr(0, width));
             }
           }
         }
@@ -91,6 +104,19 @@ std::string DateFormatter::setCustomField(const std::string& field,
     found = new_format_string.find(field, ++index);
   }
 
+  return new_format_string;
+}
+
+std::string DateFormatter::setCustomFieldRegex(const std::regex& field,
+                                               const std::string& value) const {
+  std::string new_format_string = format_string_;
+  std::smatch result;
+  while (regex_search(new_format_string, result, field)) {
+    ASSERT(result.size() == 2);
+    const std::string& width_specifier = result[1];
+    const uint32_t width = width_specifier.empty() ? value.size() : std::stoul(result[1]);
+    new_format_string.replace(result.position(), result.length(), value.substr(0, width));
+  }
   return new_format_string;
 }
 
