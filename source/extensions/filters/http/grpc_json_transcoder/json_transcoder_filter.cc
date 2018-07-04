@@ -349,6 +349,11 @@ Http::FilterDataStatus JsonTranscoderFilter::encodeData(Buffer::Instance& data, 
   readToBuffer(*transcoder_->ResponseOutput(), data);
 
   if (!method_->server_streaming() && !end_stream) {
+    // If the output type is google.api.HttpBody, encode response based on the information from the
+    // output data.
+    Grpc::Common::buildResponseFromHttpBody(method_->output_type()->full_name(), *response_headers_,
+                                            data);
+
     // Buffer until the response is complete.
     return Http::FilterDataStatus::StopIterationAndBuffer;
   }

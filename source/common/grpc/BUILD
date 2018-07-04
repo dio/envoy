@@ -68,6 +68,7 @@ envoy_cc_library(
         "//include/envoy/upstream:upstream_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
+        "//source/common/common:base64_lib",
         "//source/common/common:empty_string",
         "//source/common/common:enum_to_int",
         "//source/common/common:macros",
@@ -77,6 +78,7 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/http:message_lib",
         "//source/common/http:utility_lib",
+        "//source/common/json:json_loader_lib",
         "//source/common/protobuf",
     ],
 )

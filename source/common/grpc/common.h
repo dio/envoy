@@ -149,6 +149,20 @@ public:
    */
   static std::string typeUrl(const std::string& qualified_name);
 
+  /**
+   * @return const std::string& fullname of google.api.HttpBody type.
+   */
+  static const std::string& httpBodyType();
+
+  /**
+   * Set response Content-Type and data using values from google.api.HttpBody.
+   * @param output_type
+   * @param response_headers
+   * @param data
+   */
+  static void buildResponseFromHttpBody(absl::string_view output_type,
+                                        Http::HeaderMap& response_headers, Buffer::Instance& data);
+
 private:
   static void checkForHeaderOnlyError(Http::Message& http_response);
 };

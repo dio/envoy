@@ -8,6 +8,7 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
+#include "common/common/base64.h"
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
@@ -16,7 +17,10 @@
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
+#include "common/json/json_loader.h"
 #include "common/protobuf/protobuf.h"
+
+#include "absl/strings/str_cat.h"
 
 namespace Envoy {
 namespace Grpc {
@@ -280,6 +284,36 @@ const std::string& Common::typeUrlPrefix() {
 
 std::string Common::typeUrl(const std::string& qualified_name) {
   return typeUrlPrefix() + "/" + qualified_name;
+}
+
+const std::string& Common::httpBodyType() {
+  CONSTRUCT_ON_FIRST_USE(std::string, "google.api.HttpBody");
+}
+
+void Common::buildResponseFromHttpBody(absl::string_view output_type,
+                                       Http::HeaderMap& response_headers, Buffer::Instance& data) {
+  if (output_type.length() != httpBodyType().length() ||
+      !StringUtil::startsWith(output_type.data(), httpBodyType(), true)) {
+    return;
+  }
+
+  uint64_t num_slices = data.getRawSlices(nullptr, 0);
+  Buffer::RawSlice slices[num_slices];
+  data.getRawSlices(slices, num_slices);
+
+  std::string raw;
+  for (const auto& slice : slices) {
+    absl::StrAppend(&raw, absl::string_view(reinterpret_cast<const char*>(slice.mem_), slice.len_));
+  }
+
+  const Json::ObjectSharedPtr http_body = Json::Factory::loadFromString(raw);
+  const std::string decoded_body = Base64::decode(http_body->getString("data"));
+
+  data.drain(data.length());
+  data.add(decoded_body);
+
+  response_headers.insertContentType().value(http_body->getString("contentType"));
+  response_headers.insertContentLength().value(decoded_body.size());
 }
 
 } // namespace Grpc
