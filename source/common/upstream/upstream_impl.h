@@ -541,18 +541,22 @@ public:
                           Network::Address::InstanceConstSharedPtr address,
                           const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint,
                           const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint,
-                          const Upstream::Host::HealthFlag health_checker_flag);
+                          const absl::optional<Upstream::Host::HealthFlag> health_checker_flag);
 
-  // TODO(dio): Add an override of registerHostForPriority to register a host to the PriorityState
-  // based on a specified priority. This will be useful for non-EDS cluster hosts setup.
-  //
-  // void registerHostForPriority(const HostSharedPtr& host, const uint32_t priority);
+  // Registers a host instance to the PriorityState.
+  void
+  registerHostForPriority(const HostSharedPtr& host,
+                          const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint,
+                          const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint,
+                          const absl::optional<Upstream::Host::HealthFlag> health_checker_flag);
 
   // Updates the cluster priority set. This should be called after the PriorityStateManager is
   // initialized.
-  void updateClusterPrioritySet(const uint32_t priority, HostVectorSharedPtr&& current_hosts,
-                                const absl::optional<HostVector>& hosts_added,
-                                const absl::optional<HostVector>& hosts_removed);
+  void
+  updateClusterPrioritySet(const uint32_t priority, HostVectorSharedPtr&& current_hosts,
+                           const absl::optional<HostVector>& hosts_added,
+                           const absl::optional<HostVector>& hosts_removed,
+                           const absl::optional<Upstream::Host::HealthFlag> health_checker_flag);
 
   // Returns the size of the current cluster priority state.
   size_t size() const { return priority_state_.size(); }
@@ -566,6 +570,8 @@ private:
   const envoy::api::v2::core::Node& local_info_node_;
 };
 
+typedef std::unique_ptr<PriorityStateManager> PriorityStateManagerPtr;
+
 /**
  * Implementation of Upstream::Cluster for static clusters (clusters that have a fixed number of
  * hosts with resolved IP addresses).
@@ -574,7 +580,7 @@ class StaticClusterImpl : public ClusterImplBase {
 public:
   StaticClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
                     Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
-                    ClusterManager& cm, bool added_via_api);
+                    const LocalInfo::LocalInfo& local_info, ClusterManager& cm, bool added_via_api);
 
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
@@ -583,7 +589,7 @@ private:
   // ClusterImplBase
   void startPreInit() override;
 
-  HostVectorSharedPtr initial_hosts_;
+  PriorityStateManagerPtr priority_state_manager_;
 };
 
 /**

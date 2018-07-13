@@ -382,8 +382,8 @@ ClusterSharedPtr ClusterImplBase::create(
 
   switch (cluster.type()) {
   case envoy::api::v2::Cluster::STATIC:
-    new_cluster.reset(
-        new StaticClusterImpl(cluster, runtime, stats, ssl_context_manager, cm, added_via_api));
+    new_cluster.reset(new StaticClusterImpl(cluster, runtime, stats, ssl_context_manager,
+                                            local_info, cm, added_via_api));
     break;
   case envoy::api::v2::Cluster::STRICT_DNS:
     new_cluster.reset(new StrictDnsClusterImpl(cluster, runtime, stats, ssl_context_manager,
@@ -666,33 +666,46 @@ void PriorityStateManager::registerHostForPriority(
     const std::string& hostname, Network::Address::InstanceConstSharedPtr address,
     const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint,
     const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint,
-    const Upstream::Host::HealthFlag health_checker_flag) {
+    const absl::optional<Upstream::Host::HealthFlag> health_checker_flag) {
+  HostSharedPtr host(new HostImpl(parent_.info(), hostname, address, lb_endpoint.metadata(),
+                                  lb_endpoint.load_balancing_weight().value(),
+                                  locality_lb_endpoint.locality(),
+                                  lb_endpoint.endpoint().health_check_config()));
+  registerHostForPriority(host, locality_lb_endpoint, lb_endpoint, health_checker_flag);
+}
+
+void PriorityStateManager::registerHostForPriority(
+    const HostSharedPtr& host,
+    const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint,
+    const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint,
+    const absl::optional<Upstream::Host::HealthFlag> health_checker_flag) {
   const uint32_t priority = locality_lb_endpoint.priority();
+
   // Should be called after initializePriorityFor.
   ASSERT(priority_state_[priority].first);
-  priority_state_[priority].first->emplace_back(
-      new HostImpl(parent_.info(), hostname, address, lb_endpoint.metadata(),
-                   lb_endpoint.load_balancing_weight().value(), locality_lb_endpoint.locality(),
-                   lb_endpoint.endpoint().health_check_config()));
 
-  const auto& health_status = lb_endpoint.health_status();
-  if (health_status == envoy::api::v2::core::HealthStatus::UNHEALTHY ||
-      health_status == envoy::api::v2::core::HealthStatus::DRAINING ||
-      health_status == envoy::api::v2::core::HealthStatus::TIMEOUT) {
-    priority_state_[priority].first->back()->healthFlagSet(health_checker_flag);
+  priority_state_[priority].first->emplace_back(host);
+  if (health_checker_flag.has_value()) {
+    const auto& health_status = lb_endpoint.health_status();
+    if (health_status == envoy::api::v2::core::HealthStatus::UNHEALTHY ||
+        health_status == envoy::api::v2::core::HealthStatus::DRAINING ||
+        health_status == envoy::api::v2::core::HealthStatus::TIMEOUT) {
+      priority_state_[priority].first->back()->healthFlagSet(health_checker_flag.value());
+    }
   }
 }
 
 void PriorityStateManager::updateClusterPrioritySet(
     const uint32_t priority, HostVectorSharedPtr&& current_hosts,
-    const absl::optional<HostVector>& hosts_added,
-    const absl::optional<HostVector>& hosts_removed) {
+    const absl::optional<HostVector>& hosts_added, const absl::optional<HostVector>& hosts_removed,
+    const absl::optional<Upstream::Host::HealthFlag> health_checker_flag) {
   // If local locality is not defined then skip populating per locality hosts.
   const auto& local_locality = local_info_node_.locality();
   ENVOY_LOG(trace, "Local locality: {}", local_locality.DebugString());
 
-  // For non-EDS, most likely the current hosts are from priority_state_[priority].first.
-  HostVectorSharedPtr hosts(std::move(current_hosts));
+  // For non-EDS, the current hosts are from priority_state_[priority].first.
+  HostVectorSharedPtr hosts(current_hosts != nullptr ? std::move(current_hosts)
+                                                     : std::move(priority_state_[priority].first));
   LocalityWeightsMap empty_locality_map;
   LocalityWeightsMap& locality_weights_map =
       priority_state_.empty() ? empty_locality_map : priority_state_[priority].second;
@@ -709,9 +722,9 @@ void PriorityStateManager::updateClusterPrioritySet(
   std::map<envoy::api::v2::core::Locality, HostVector, LocalityLess> hosts_per_locality;
 
   for (const HostSharedPtr& host : *hosts) {
-    // TODO(dio): Take into consideration when a non-EDS cluster has active health checking, i.e. to
-    // mark all the hosts unhealthy (host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC)) and
-    // then fire update callbacks to start the health checking process.
+    if (health_checker_flag.has_value()) {
+      host->healthFlagSet(health_checker_flag.value());
+    }
     hosts_per_locality[host->locality()].push_back(host);
   }
 
@@ -753,36 +766,41 @@ void PriorityStateManager::updateClusterPrioritySet(
 
 StaticClusterImpl::StaticClusterImpl(const envoy::api::v2::Cluster& cluster,
                                      Runtime::Loader& runtime, Stats::Store& stats,
-                                     Ssl::ContextManager& ssl_context_manager, ClusterManager& cm,
+                                     Ssl::ContextManager& ssl_context_manager,
+                                     const LocalInfo::LocalInfo& local_info, ClusterManager& cm,
                                      bool added_via_api)
     : ClusterImplBase(cluster, cm.bindConfig(), runtime, stats, ssl_context_manager,
                       cm.clusterManagerFactory().secretManager(), added_via_api),
-      initial_hosts_(new HostVector()) {
+      priority_state_manager_(new PriorityStateManager(*this, local_info)) {
+  // TODO(dio): Use by-reference when cluster.hosts() is removed.
+  const envoy::api::v2::ClusterLoadAssignment cluster_load_assignment(
+      cluster.has_load_assignment() ? cluster.load_assignment()
+                                    : Config::Utility::translateClusterHosts(cluster.hosts()));
 
-  for (const auto& host : cluster.hosts()) {
-    initial_hosts_->emplace_back(HostSharedPtr{new HostImpl(
-        info_, "", resolveProtoAddress(host), envoy::api::v2::core::Metadata::default_instance(), 1,
-        envoy::api::v2::core::Locality().default_instance(),
-        envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance())});
+  for (const auto& locality_lb_endpoint : cluster_load_assignment.endpoints()) {
+    priority_state_manager_->initializePriorityFor(locality_lb_endpoint);
+
+    for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
+      priority_state_manager_->registerHostForPriority(
+          "", resolveProtoAddress(lb_endpoint.endpoint().address()), locality_lb_endpoint,
+          lb_endpoint, absl::nullopt);
+    }
   }
 }
 
 void StaticClusterImpl::startPreInit() {
-  // At this point see if we have a health checker. If so, mark all the hosts unhealthy and then
-  // fire update callbacks to start the health checking process.
-  if (health_checker_) {
-    for (const auto& host : *initial_hosts_) {
-      host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
-    }
-  }
+  // At this point see if we have a health checker. If so, mark all the hosts unhealthy and
+  // then fire update callbacks to start the health checking process.
+  const auto& health_checker_flag =
+      health_checker_ != nullptr
+          ? absl::optional<Upstream::Host::HealthFlag>(Host::HealthFlag::FAILED_ACTIVE_HC)
+          : absl::nullopt;
 
-  // Given the current config, only EDS clusters support multiple priorities.
-  ASSERT(priority_set_.hostSetsPerPriority().size() == 1);
-  auto& first_host_set = priority_set_.getOrCreateHostSet(0);
-  first_host_set.updateHosts(initial_hosts_, createHealthyHostList(*initial_hosts_),
-                             HostsPerLocalityImpl::empty(), HostsPerLocalityImpl::empty(), {},
-                             *initial_hosts_, {});
-  initial_hosts_ = nullptr;
+  for (size_t i = 0; i < priority_state_manager_->size(); ++i) {
+    priority_state_manager_->updateClusterPrioritySet(i, nullptr, absl::nullopt, absl::nullopt,
+                                                      health_checker_flag);
+  }
+  priority_state_manager_.reset();
 
   onPreInitComplete();
 }
