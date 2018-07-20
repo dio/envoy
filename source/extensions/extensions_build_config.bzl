@@ -56,6 +56,8 @@ EXTENSIONS = {
 
     "envoy.filters.listener.tls_inspector":             "//source/extensions/filters/listener/tls_inspector:config",
 
+    "envoy.filters.listener.text_protocol_inspector":   "//source/extensions/filters/listener/text_protocol_inspector:config",
+
     #
     # Network filters
     #
