@@ -518,6 +518,10 @@ void HeaderMapImpl::removePrefix(const LowerCaseString& prefix) {
   });
 }
 
+bool HeaderMapImpl::isStaticHeader(const LowerCaseString& key) {
+  return ConstSingleton<StaticLookupTable>::get().find(key.get().c_str()) != nullptr;
+}
+
 HeaderMapImpl::HeaderEntryImpl& HeaderMapImpl::maybeCreateInline(HeaderEntryImpl** entry,
                                                                  const LowerCaseString& key) {
   if (*entry) {

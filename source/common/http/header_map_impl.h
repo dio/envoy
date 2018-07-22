@@ -78,6 +78,7 @@ public:
   void remove(const LowerCaseString& key) override;
   void removePrefix(const LowerCaseString& key) override;
   size_t size() const override { return headers_.size(); }
+  static bool isStaticHeader(const LowerCaseString& key);
 
 protected:
   struct HeaderEntryImpl : public HeaderEntry, NonCopyable {

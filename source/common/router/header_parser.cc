@@ -6,6 +6,7 @@
 #include <string>
 
 #include "common/common/assert.h"
+#include "common/http/header_map_impl.h"
 #include "common/protobuf/utility.h"
 
 #include "absl/strings/str_cat.h"
@@ -212,10 +213,13 @@ HeaderParserPtr HeaderParser::configure(
   HeaderParserPtr header_parser(new HeaderParser());
 
   for (const auto& header_value_option : headers_to_add) {
+    const Http::LowerCaseString header_key(header_value_option.header().key());
+    const bool append = PROTOBUF_GET_WRAPPED_OR_DEFAULT(header_value_option, append, true);
+    if (Http::HeaderMapImpl::isStaticHeader(header_key) && append) {
+      continue;
+    }
     HeaderFormatterPtr header_formatter = parseInternal(header_value_option);
-
-    header_parser->headers_to_add_.emplace_back(
-        Http::LowerCaseString(header_value_option.header().key()), std::move(header_formatter));
+    header_parser->headers_to_add_.emplace_back(header_key, std::move(header_formatter));
   }
 
   return header_parser;
