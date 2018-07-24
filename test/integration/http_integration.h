@@ -116,7 +116,7 @@ protected:
                                             ConnectionCreationFunction* creator = nullptr);
   void testRouterHeaderOnlyRequestAndResponse(bool close_upstream,
                                               ConnectionCreationFunction* creator = nullptr);
-  void testRouterUpstreamDisconnectBeforeRequestComplete();
+  void testRouterUpstreamDisconnectBeforeRequestComplete(const std::string& method);
   void
   testRouterUpstreamDisconnectBeforeResponseComplete(ConnectionCreationFunction* creator = nullptr);
   void testRouterDownstreamDisconnectBeforeRequestComplete(

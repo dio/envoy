@@ -81,7 +81,11 @@ TEST_P(IntegrationTest, ShutdownWithActiveConnPoolConnections) {
 }
 
 TEST_P(IntegrationTest, RouterUpstreamDisconnectBeforeRequestcomplete) {
-  testRouterUpstreamDisconnectBeforeRequestComplete();
+  testRouterUpstreamDisconnectBeforeRequestComplete("GET");
+}
+
+TEST_P(IntegrationTest, RouterUpstreamDisconnectBeforeHeadRequestcomplete) {
+  testRouterUpstreamDisconnectBeforeRequestComplete("HEAD");
 }
 
 TEST_P(IntegrationTest, RouterUpstreamDisconnectBeforeResponseComplete) {

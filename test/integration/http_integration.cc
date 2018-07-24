@@ -439,12 +439,13 @@ void HttpIntegrationTest::testDrainClose() {
   test_server_->drainManager().draining_ = false;
 }
 
-void HttpIntegrationTest::testRouterUpstreamDisconnectBeforeRequestComplete() {
+void HttpIntegrationTest::testRouterUpstreamDisconnectBeforeRequestComplete(
+    const std::string& method) {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   auto encoder_decoder =
-      codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "GET"},
+      codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", method},
                                                           {":path", "/test/long/url"},
                                                           {":scheme", "http"},
                                                           {":authority", "host"}});
@@ -467,9 +468,12 @@ void HttpIntegrationTest::testRouterUpstreamDisconnectBeforeRequestComplete() {
   EXPECT_FALSE(upstream_request_->complete());
   EXPECT_EQ(0U, upstream_request_->bodyLength());
 
-  EXPECT_TRUE(response->complete());
+  EXPECT_EQ(response->complete(), response->body().size() > 0);
   EXPECT_STREQ("503", response->headers().Status()->value().c_str());
-  EXPECT_EQ("upstream connect error or disconnect/reset before headers", response->body());
+  EXPECT_EQ(response->body().size() > 0
+                ? "upstream connect error or disconnect/reset before headers"
+                : "",
+            response->body());
 }
 
 void HttpIntegrationTest::testRouterUpstreamDisconnectBeforeResponseComplete(

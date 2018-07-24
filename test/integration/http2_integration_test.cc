@@ -62,7 +62,7 @@ TEST_P(Http2IntegrationTest, ShutdownWithActiveConnPoolConnections) {
 }
 
 TEST_P(Http2IntegrationTest, RouterUpstreamDisconnectBeforeRequestcomplete) {
-  testRouterUpstreamDisconnectBeforeRequestComplete();
+  testRouterUpstreamDisconnectBeforeRequestComplete("GET");
 }
 
 TEST_P(Http2IntegrationTest, RouterUpstreamDisconnectBeforeResponseComplete) {

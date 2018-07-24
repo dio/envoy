@@ -496,17 +496,19 @@ void Filter::onUpstreamReset(UpstreamResetType type,
     cleanup();
     Http::Code code;
     const char* body;
+    const bool head_request =
+        downstream_headers_->Method()->value() == Http::Headers::get().MethodValues.Head.c_str();
     if (type == UpstreamResetType::GlobalTimeout || type == UpstreamResetType::PerTryTimeout) {
       callbacks_->requestInfo().setResponseFlag(RequestInfo::ResponseFlag::UpstreamRequestTimeout);
 
       code = timeout_response_code_;
-      body = code == Http::Code::GatewayTimeout ? "upstream request timeout" : "";
+      body = code == Http::Code::GatewayTimeout && !head_request ? "upstream request timeout" : "";
     } else {
       RequestInfo::ResponseFlag response_flags =
           streamResetReasonToResponseFlag(reset_reason.value());
       callbacks_->requestInfo().setResponseFlag(response_flags);
       code = Http::Code::ServiceUnavailable;
-      body = "upstream connect error or disconnect/reset before headers";
+      body = head_request ? "" : "upstream connect error or disconnect/reset before headers";
     }
 
     const bool dropped = reset_reason && reset_reason.value() == Http::StreamResetReason::Overflow;
