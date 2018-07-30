@@ -93,6 +93,10 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
         connection.ssl() ? Headers::get().SchemeValues.Https : Headers::get().SchemeValues.Http);
   }
 
+  if (!request_headers.ForwardedPort()) {
+    request_headers.insertForwardedPort().value(connection.localAddress()->ip()->port());
+  }
+
   // At this point we can determine whether this is an internal or external request. The
   // determination of internal status uses the following:
   // 1) After remote address/XFF appending, the XFF header must contain a *single* address.
