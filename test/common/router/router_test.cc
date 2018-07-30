@@ -2203,6 +2203,7 @@ TEST_F(RouterTest, AutoHostRewriteEnabled) {
   Http::TestHeaderMapImpl outgoing_headers;
   HttpTestUtility::addDefaultHeaders(outgoing_headers);
   outgoing_headers.Host()->value(cm_.conn_pool_.host_->hostname_);
+  outgoing_headers.insertForwardedPort().value(cm_.conn_pool_.host_->address()->ip()->port());
 
   EXPECT_CALL(callbacks_.route_->route_entry_, timeout())
       .WillOnce(Return(std::chrono::milliseconds(0)));

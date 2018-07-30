@@ -130,6 +130,7 @@ TEST_F(AsyncClientImplTest, Basic) {
   TestHeaderMapImpl copy(message_->headers());
   copy.addCopy("x-envoy-internal", "true");
   copy.addCopy("x-forwarded-for", "127.0.0.1");
+  copy.addCopy("x-forwarded-port", "443");
   copy.addCopy(":scheme", "http");
 
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&copy), false));

@@ -372,6 +372,7 @@ protected:
       headers.remove(Envoy::Http::LowerCaseString{"x-envoy-upstream-service-time"});
     }
     headers.remove(Envoy::Http::LowerCaseString{"x-forwarded-proto"});
+    headers.remove(Envoy::Http::LowerCaseString{"x-forwarded-port"});
     headers.remove(Envoy::Http::LowerCaseString{"x-request-id"});
     headers.remove(Envoy::Http::LowerCaseString{"x-envoy-internal"});
 

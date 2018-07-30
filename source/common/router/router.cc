@@ -973,9 +973,6 @@ void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
 
   // TODO(ggreenway): set upstream local address in the RequestInfo.
   onUpstreamHostSelected(host);
-  if (!parent_.downstream_headers_->ForwardedPort()) {
-    parent_.downstream_headers_->insertForwardedPort().value(host->address()->ip()->port());
-  }
   request_encoder.getStream().addCallbacks(*this);
 
   conn_pool_stream_handle_ = nullptr;
@@ -983,6 +980,11 @@ void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
   calling_encode_headers_ = true;
   if (parent_.route_entry_->autoHostRewrite() && !host->hostname().empty()) {
     parent_.downstream_headers_->Host()->value(host->hostname());
+  }
+
+  const auto& ip = host->address()->ip();
+  if (!parent_.downstream_headers_->ForwardedPort() && ip != nullptr) {
+    parent_.downstream_headers_->insertForwardedPort().value(ip->port());
   }
 
   if (span_ != nullptr) {

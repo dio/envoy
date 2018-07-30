@@ -105,7 +105,7 @@ void WebsocketIntegrationTest::validateFinalDownstreamData(const std::string& re
 
 void WebsocketIntegrationTest::validateFinalUpstreamData(const std::string& received_data,
                                                          const std::string& expected_data) {
-  std::regex extra_response_headers("x-request-id:.*\r\n");
+  std::regex extra_response_headers("(x-forwarded-port|x-request-id):.*\r\n");
   std::string stripped_data = std::regex_replace(received_data, extra_response_headers, "");
   EXPECT_EQ(expected_data, stripped_data);
 }
@@ -437,7 +437,7 @@ TEST_P(WebsocketIntegrationTest, NonWebsocketUpgrade) {
                                        "x-envoy-expected-rq-timeout-ms: 15000\r\n\r\n"
                                        "hellobye!";
 
-  std::regex extra_response_headers("x-request-id:.*\r\n");
+  std::regex extra_response_headers("(x-forwarded-port|x-request-id):.*\r\n");
   std::string stripped_data = std::regex_replace(final_data, extra_response_headers, "");
   EXPECT_EQ(upstream_payload, stripped_data);
 }
