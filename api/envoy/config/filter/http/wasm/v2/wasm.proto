@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package envoy.config.filter.http.wasm.v2;
+option go_package = "v2";
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/struct.proto";
+
+import "validate/validate.proto";
+import "gogoproto/gogo.proto";
+
+message Wasm {
+  string realm = 1;
+  string username = 2;
+  string password = 3;
+  string message = 4;
+}

@@ -67,6 +67,23 @@ cc_library(
 )
 
 cc_library(
+    name = "wabt",
+    srcs = select({
+        ":windows_x86_64": glob(["thirdparty_build/lib/libwabt*.lib"]),
+        "//conditions:default": ["thirdparty_build/lib/libwabt.a"],
+    }),
+    hdrs = glob([
+        "thirdparty_build/include/wabt/*.h",
+        "thirdparty_build/include/wabt/interp/*.h",
+        "thirdparty_build/include/wabt/*.def",
+        "thirdparty_build/include/wabt/src/*.h",
+        "thirdparty_build/include/wabt/src/interp/*.h",
+        "thirdparty_build/include/wabt/src/*.def",
+    ]),
+    includes = ["thirdparty_build/include", "thirdparty_build/include/wabt", "thirdparty_build/include/interp"],
+)
+
+cc_library(
     name = "yaml_cpp",
     srcs = select({
         ":windows_x86_64": glob(["thirdparty_build/lib/libyaml-cpp*.lib"]),
