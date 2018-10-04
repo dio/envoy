@@ -67,6 +67,23 @@ cc_library(
 )
 
 cc_library(
+    name = "wabt",
+    srcs = select({
+        ":windows_x86_64": glob(["thirdparty_build/lib/libwabt*.lib"]),
+        "//conditions:default": ["thirdparty_build/lib/libwabt.a"],
+    }),
+    hdrs = glob([
+        "thirdparty_build/include/wabt/**/*.h",
+        "thirdparty_build/include/wabt/**/*.def",
+    ]),
+    includes = [
+        "thirdparty_build/include",
+        "thirdparty_build/include/wabt",
+    ],
+    # TODO(dio): This is a hack so consumers can always use "wabt/*".
+)
+
+cc_library(
     name = "yaml_cpp",
     srcs = select({
         ":windows_x86_64": glob(["thirdparty_build/lib/libyaml-cpp*.lib"]),

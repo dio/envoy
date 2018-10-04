@@ -8,6 +8,7 @@ TARGET_RECIPES = {
     "tcmalloc_and_profiler": "gperftools",
     "luajit": "luajit",
     "nghttp2": "nghttp2",
+    "wabt": "wabt",
     "yaml_cpp": "yaml-cpp",
     "zlib": "zlib",
 }
