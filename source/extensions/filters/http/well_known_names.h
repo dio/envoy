@@ -40,6 +40,8 @@ public:
   const std::string Lua = "envoy.lua";
   // Squash filter
   const std::string Squash = "envoy.squash";
+  // WASM filter
+  const std::string Wasm = "envoy.wasm";
   // External Authorization filter
   const std::string ExtAuthorization = "envoy.ext_authz";
   // RBAC HTTP Authorization filter

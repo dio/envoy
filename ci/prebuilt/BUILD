@@ -67,6 +67,19 @@ cc_library(
 )
 
 cc_library(
+    name = "wasm_c_api",
+    srcs = ["thirdparty_build/lib/libv8_monolith.a", "thirdparty_build/lib/libwasm.a"],
+    hdrs = glob([
+        "thirdparty_build/include/wasm-c-api/*.h",
+        "thirdparty_build/include/wasm-c-api/*.hh",
+    ]),
+    includes = [
+        "thirdparty_build/include",
+        "thirdparty_build/include/wasm-c-api",
+    ],
+)
+
+cc_library(
     name = "yaml_cpp",
     srcs = select({
         ":windows_x86_64": glob(["thirdparty_build/lib/libyaml-cpp*.lib"]),
