@@ -83,7 +83,7 @@ private:
     auto file_size = file.tellg();
     file.seekg(0);
     auto binary = wasm::vec<byte_t>::make_uninitialized(file_size);
-    file.read(binary_.get(), file_size);
+    file.read(binary.get(), file_size);
     file.close();
     if (file.fail()) {
       // TODO(dio): throw error.
@@ -92,7 +92,7 @@ private:
     return binary;
   }
 
-  wasm::Name binary_;
+  const wasm::Name binary_;
   wasm::own<wasm::Engine*> engine_;
 };
 } // namespace Wasm
