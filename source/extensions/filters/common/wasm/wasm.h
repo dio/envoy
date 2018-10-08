@@ -15,7 +15,7 @@ namespace Common {
 namespace Wasm {
 class Program {
 public:
-  Program(const std::string& filename) : filename_{filename} {
+  Program(const std::string& filename) : binary_{load(filename)} {
     engine_ = wasm::Engine::make();
   }
 
@@ -32,24 +32,11 @@ public:
     auto store_ = wasm::Store::make(engine_.get());
     auto store = store_.get();
 
-    // Load binary.
-    std::cout << "Loading binary..." << std::endl;
-    std::ifstream file(filename_);
-    file.seekg(0, std::ios_base::end);
-    auto file_size = file.tellg();
-    file.seekg(0);
-    auto binary = wasm::vec<byte_t>::make_uninitialized(file_size);
-    file.read(binary.get(), file_size);
-    file.close();
-    if (file.fail()) {
-      std::cout << "> Error loading module!" << std::endl;
-      return;
-    }
-
     // Compile.
     std::cout << "Compiling module..." << std::endl;
-    auto module = wasm::Module::make(store, binary);
+    auto module = wasm::Module::make(store, binary_);
     if (!module) {
+      // TODO(dio): throw error.
       std::cout << "> Error compiling module!" << std::endl;
       return;
     }
@@ -65,6 +52,7 @@ public:
     auto imports = wasm::vec<wasm::Extern*>::make(hello_func);
     auto instance = wasm::Instance::make(store, module.get(), imports);
     if (!instance) {
+      // TODO(dio): throw error.
       std::cout << "> Error instantiating module!" << std::endl;
       return;
     }
@@ -73,6 +61,7 @@ public:
     std::cout << "Extracting export..." << std::endl;
     auto exports = instance->exports();
     if (exports.size() == 0 || exports[0]->kind() != wasm::EXTERN_FUNC || !exports[0]->func()) {
+      // TODO(dio): throw error.
       std::cout << "> Error accessing export!" << std::endl;
       return;
     }
@@ -87,8 +76,24 @@ public:
   }
 
 private:
-  const std::string filename_;
-  wasm::own<wasm::Engine *> engine_;
+  wasm::Name load(const std::string& filename) {
+    std::cout << "Loading binary..." << std::endl;
+    std::ifstream file(filename);
+    file.seekg(0, std::ios_base::end);
+    auto file_size = file.tellg();
+    file.seekg(0);
+    auto binary = wasm::vec<byte_t>::make_uninitialized(file_size);
+    file.read(binary_.get(), file_size);
+    file.close();
+    if (file.fail()) {
+      // TODO(dio): throw error.
+      std::cout << "> Error loading module!" << std::endl;
+    }
+    return binary;
+  }
+
+  wasm::Name binary_;
+  wasm::own<wasm::Engine*> engine_;
 };
 } // namespace Wasm
 } // namespace Common
