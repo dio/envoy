@@ -115,6 +115,7 @@ def _build_recipe_repository_impl(ctxt):
         command,
         environment = env,
         quiet = False,
+        timeout = 6000
     )
     print(result.stdout)
     print(result.stderr)

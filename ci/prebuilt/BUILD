@@ -68,7 +68,7 @@ cc_library(
 
 cc_library(
     name = "wasm_c_api",
-    srcs = ["thirdparty_build/lib/libv8_monolith.a", "thirdparty_build/lib/libwasm.a"],
+    srcs = ["thirdparty_build/lib/libv8_monolith.a", "thirdparty_build/lib/wasm.a"],
     hdrs = glob([
         "thirdparty_build/include/wasm-c-api/*.h",
         "thirdparty_build/include/wasm-c-api/*.hh",
