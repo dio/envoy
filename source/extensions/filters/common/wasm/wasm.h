@@ -1,10 +1,12 @@
 #pragma once
 
-#include <iostream>
-#include <fstream>
-#include <cstdlib>
-#include <string>
 #include <cinttypes>
+#include <cstdlib>
+#include <fstream>
+#include <iostream>
+#include <string>
+
+#include "envoy/common/exception.h"
 
 #include "wasm-c-api/wasm.hh"
 
@@ -15,11 +17,8 @@ namespace Common {
 namespace Wasm {
 class Program {
 public:
-  Program(const std::string& filename) : binary_{load(filename)} {
-    engine_ = wasm::Engine::make();
-  }
+  Program(const std::string& filename) : binary_{load(filename)} { engine_ = wasm::Engine::make(); }
 
-  // A function to be called from Wasm code.
   static auto hello_callback(const wasm::vec<wasm::Val>&) -> wasm::Result {
     std::cout << "Calling back..." << std::endl;
     std::cout << "> Hello world!" << std::endl;
@@ -27,57 +26,32 @@ public:
   }
 
   void run() {
-    // Initialize.
-    std::cout << "Initializing..." << std::endl;
-    auto store_ = wasm::Store::make(engine_.get());
-    auto store = store_.get();
-
-    // Compile.
-    std::cout << "Compiling module..." << std::endl;
-    auto module = wasm::Module::make(store, binary_);
+    auto store = wasm::Store::make(engine_.get());
+    auto module = wasm::Module::make(store.get(), binary_);
     if (!module) {
-      // TODO(dio): throw error.
-      std::cout << "> Error compiling module!" << std::endl;
-      return;
+      throw EnvoyException("Failed to compile the module");
     }
 
-    // Create external print functions.
-    std::cout << "Creating callback..." << std::endl;
     auto hello_type =
         wasm::FuncType::make(wasm::vec<wasm::ValType*>::make(), wasm::vec<wasm::ValType*>::make());
-    auto hello_func = wasm::Func::make(store, hello_type.get(), Program::hello_callback);
+    auto hello_func = wasm::Func::make(store.get(), hello_type.get(), Program::hello_callback);
 
-    // Instantiate.
-    std::cout << "Instantiating module..." << std::endl;
     auto imports = wasm::vec<wasm::Extern*>::make(hello_func);
-    auto instance = wasm::Instance::make(store, module.get(), imports);
+    auto instance = wasm::Instance::make(store.get(), module.get(), imports);
     if (!instance) {
-      // TODO(dio): throw error.
-      std::cout << "> Error instantiating module!" << std::endl;
-      return;
+      throw EnvoyException("Failed to instantiate the module");
     }
 
-    // Extract export.
-    std::cout << "Extracting export..." << std::endl;
     auto exports = instance->exports();
     if (exports.size() == 0 || exports[0]->kind() != wasm::EXTERN_FUNC || !exports[0]->func()) {
-      // TODO(dio): throw error.
-      std::cout << "> Error accessing export!" << std::endl;
-      return;
+      throw EnvoyException("Failed to access export");
     }
     auto run_func = exports[0]->func();
-
-    // Call.
-    std::cout << "Calling export..." << std::endl;
     run_func->call();
-
-    // Shut down.
-    std::cout << "Shutting down..." << std::endl;
   }
 
 private:
   wasm::Name load(const std::string& filename) {
-    std::cout << "Loading binary..." << std::endl;
     std::ifstream file(filename);
     file.seekg(0, std::ios_base::end);
     auto file_size = file.tellg();
@@ -86,8 +60,7 @@ private:
     file.read(binary.get(), file_size);
     file.close();
     if (file.fail()) {
-      // TODO(dio): throw error.
-      std::cout << "> Error loading module!" << std::endl;
+      throw EnvoyException("Failed to load the module");
     }
     return binary;
   }
