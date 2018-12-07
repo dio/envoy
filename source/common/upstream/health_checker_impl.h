@@ -324,6 +324,7 @@ private:
     // e.g. remote reset. In this case healthcheck status has already been reported, only state
     // cleanup is required.
     bool expect_reset_ = false;
+    const std::string hostname_;
   };
 
   virtual Http::CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) PURE;
@@ -338,6 +339,7 @@ private:
 
   const Protobuf::MethodDescriptor& service_method_;
   absl::optional<std::string> service_name_;
+  const std::string host_value_;
 };
 
 /**
