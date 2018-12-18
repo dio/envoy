@@ -62,10 +62,7 @@ void GrpcAccessLogStreamerImpl::ThreadLocalStreamer::send(
     if (method_name.empty()) {
       stream_entry.stream_->sendMessage(message, false);
     } else {
-      for (const auto& entry : message.http_logs().log_entry()) {
-        std::cerr << "method_name: " << method_name << "\n";
-        stream_entry.stream_->sendMessage(entry.skywalking_metric(), false);
-      }
+      stream_entry.stream_->sendMessage(message, false);
     }
   } else {
     // Clear out the stream data due to stream creation failure.
@@ -353,24 +350,6 @@ void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,
       }
     }
   }
-
-  auto* skywalking_metric = log_entry->mutable_skywalking_metric();
-  skywalking_metric->set_starttime(1545105005);
-  skywalking_metric->set_endtime(1545105027);
-  skywalking_metric->set_sourceservicename("ok");
-  skywalking_metric->set_sourceserviceinstance("ok-instance");
-  skywalking_metric->set_destservicename("cool");
-  skywalking_metric->set_destserviceinstance("cool-instance");
-  skywalking_metric->set_endpoint("/");
-  skywalking_metric->set_latency(1000);
-  skywalking_metric->set_responsecode(200);
-  skywalking_metric->set_status(true);
-  skywalking_metric->set_protocol(
-      org::apache::skywalking::apm::network::servicemesh::Protocol::HTTP);
-  skywalking_metric->set_detectpoint(
-      org::apache::skywalking::apm::network::servicemesh::DetectPoint::client);
-
-  std::cout << "OK\n";
 
   // TODO(mattklein123): Consider batching multiple logs and flushing.
   grpc_access_log_streamer_->send(message, config_.common_config().log_name(),

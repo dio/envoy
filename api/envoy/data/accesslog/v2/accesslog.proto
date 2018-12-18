@@ -49,7 +49,8 @@ message HTTPAccessLogEntry {
   // Description of the outgoing HTTP response.
   HTTPResponseProperties response = 4;
 
-  ServiceMeshMetric skywalking_metric = 5;
+  // Skywalking metric.
+  org.apache.skywalking.apm.network.servicemesh.ServiceMeshMetric skywalking_metric = 5;
 }
 
 // Defines fields that are shared by all Envoy access logs.

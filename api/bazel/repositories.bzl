@@ -16,8 +16,8 @@ PROMETHEUS_SHA = "783bdaf8ee0464b35ec0c8704871e1e72afa0005c3f3587f65d9d6694bf391
 OPENCENSUS_GIT_SHA = "ab82e5fdec8267dc2a726544b10af97675970847"  # May 23, 2018
 OPENCENSUS_SHA = "1950f844d9f338ba731897a9bb526f9074c0487b3f274ce2ec3b4feaf0bef7e2"
 
-SKYWALKING_GIT_SHA = "dd6a8f86768d0c7fbd967f8b1d8ee7a4e6248570"
-SKYWALKING_SHA = "bbb2644b560bd6fd144c0a8de7e3d3cf4c423e92bd13704d6564ceab795aacc4"
+SKYWALKING_GIT_SHA = "4568be474172510176ac51ca5e277ecd343d7ff0"
+SKYWALKING_SHA = "bae0376f074a4ebf83bcf033a067ad04f37d6e7e7ee9135605e0484a44fe183b"
 
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
@@ -316,25 +316,17 @@ go_proto_library(
     http_archive(
         name = "com_github_apache_incubator_skywalking",
         strip_prefix = "incubator-skywalking-data-collect-protocol-" + SKYWALKING_GIT_SHA,
-        url = "https://github.com/apache/incubator-skywalking-data-collect-protocol/archive/" + SKYWALKING_GIT_SHA + ".tar.gz",
+        url = "https://github.com/dio/incubator-skywalking-data-collect-protocol/archive/" + SKYWALKING_GIT_SHA + ".tar.gz",
         sha256 = SKYWALKING_SHA,
         build_file_content = """
 load("@envoy_api//bazel:api_build_system.bzl", "api_proto_library")
-load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
 
-api_proto_library(
-    name = "data_protocol",
+native.proto_library(
+    name = "data_protocol_cc",
     srcs = [
         "common/common.proto",
         "service-mesh-probe/service-mesh.proto",
     ],
-    visibility = ["//visibility:public"],
-)
-
-go_proto_library(
-    name = "data_protocol_proto",
-    importpath = "data_protocol",
-    proto = ":data_protocol",
     visibility = ["//visibility:public"],
 )
         """,
