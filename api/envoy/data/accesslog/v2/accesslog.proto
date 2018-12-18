@@ -11,6 +11,8 @@ import "google/protobuf/wrappers.proto";
 import "gogoproto/gogo.proto";
 import "validate/validate.proto";
 
+import "service-mesh-probe/service-mesh.proto";
+
 // [#protodoc-title: gRPC access logs]
 // Envoy access logs describe incoming interaction with Envoy over a fixed
 // period of time, and typically cover a single request/response exchange,
@@ -46,6 +48,8 @@ message HTTPAccessLogEntry {
 
   // Description of the outgoing HTTP response.
   HTTPResponseProperties response = 4;
+
+  ServiceMeshMetric skywalking_metric = 5;
 }
 
 // Defines fields that are shared by all Envoy access logs.

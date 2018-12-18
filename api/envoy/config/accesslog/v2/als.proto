@@ -45,4 +45,7 @@ message CommonGrpcAccessLogConfig {
 
   // The gRPC service for the access log service.
   envoy.api.v2.core.GrpcService grpc_service = 2 [(validate.rules).message.required = true];
+
+  // The method name to be used.
+  string method_name = 3;
 }

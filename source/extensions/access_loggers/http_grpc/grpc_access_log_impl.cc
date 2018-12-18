@@ -38,7 +38,8 @@ GrpcAccessLogStreamerImpl::ThreadLocalStreamer::ThreadLocalStreamer(
     : client_(shared_state->factory_->create()), shared_state_(shared_state) {}
 
 void GrpcAccessLogStreamerImpl::ThreadLocalStreamer::send(
-    envoy::service::accesslog::v2::StreamAccessLogsMessage& message, const std::string& log_name) {
+    envoy::service::accesslog::v2::StreamAccessLogsMessage& message, const std::string& log_name,
+    const std::string& method_name) {
   auto stream_it = stream_map_.find(log_name);
   if (stream_it == stream_map_.end()) {
     stream_it = stream_map_.emplace(log_name, ThreadLocalStream(*this, log_name)).first;
@@ -46,10 +47,11 @@ void GrpcAccessLogStreamerImpl::ThreadLocalStreamer::send(
 
   auto& stream_entry = stream_it->second;
   if (stream_entry.stream_ == nullptr) {
-    stream_entry.stream_ =
-        client_->start(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-                           "envoy.service.accesslog.v2.AccessLogService.StreamAccessLogs"),
-                       stream_entry);
+    stream_entry.stream_ = client_->start(
+        *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+            method_name.empty() ? "envoy.service.accesslog.v2.AccessLogService.StreamAccessLogs"
+                                : method_name),
+        stream_entry);
 
     auto* identifier = message.mutable_identifier();
     *identifier->mutable_node() = shared_state_->local_info_.node();
@@ -57,7 +59,14 @@ void GrpcAccessLogStreamerImpl::ThreadLocalStreamer::send(
   }
 
   if (stream_entry.stream_ != nullptr) {
-    stream_entry.stream_->sendMessage(message, false);
+    if (method_name.empty()) {
+      stream_entry.stream_->sendMessage(message, false);
+    } else {
+      for (const auto& entry : message.http_logs().log_entry()) {
+        std::cerr << "method_name: " << method_name << "\n";
+        stream_entry.stream_->sendMessage(entry.skywalking_metric(), false);
+      }
+    }
   } else {
     // Clear out the stream data due to stream creation failure.
     stream_map_.erase(stream_it);
@@ -345,8 +354,27 @@ void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,
     }
   }
 
+  auto* skywalking_metric = log_entry->mutable_skywalking_metric();
+  skywalking_metric->set_starttime(1545105005);
+  skywalking_metric->set_endtime(1545105027);
+  skywalking_metric->set_sourceservicename("ok");
+  skywalking_metric->set_sourceserviceinstance("ok-instance");
+  skywalking_metric->set_destservicename("cool");
+  skywalking_metric->set_destserviceinstance("cool-instance");
+  skywalking_metric->set_endpoint("/");
+  skywalking_metric->set_latency(1000);
+  skywalking_metric->set_responsecode(200);
+  skywalking_metric->set_status(true);
+  skywalking_metric->set_protocol(
+      org::apache::skywalking::apm::network::servicemesh::Protocol::HTTP);
+  skywalking_metric->set_detectpoint(
+      org::apache::skywalking::apm::network::servicemesh::DetectPoint::client);
+
+  std::cout << "OK\n";
+
   // TODO(mattklein123): Consider batching multiple logs and flushing.
-  grpc_access_log_streamer_->send(message, config_.common_config().log_name());
+  grpc_access_log_streamer_->send(message, config_.common_config().log_name(),
+                                  config_.common_config().method_name());
 }
 
 } // namespace HttpGrpc

@@ -34,7 +34,7 @@ public:
    * @param log_name supplies the name of the log stream to send on.
    */
   virtual void send(envoy::service::accesslog::v2::StreamAccessLogsMessage& message,
-                    const std::string& log_name) PURE;
+                    const std::string& log_name, const std::string& method_name) PURE;
 };
 
 typedef std::shared_ptr<GrpcAccessLogStreamer> GrpcAccessLogStreamerSharedPtr;
@@ -50,8 +50,8 @@ public:
 
   // GrpcAccessLogStreamer
   void send(envoy::service::accesslog::v2::StreamAccessLogsMessage& message,
-            const std::string& log_name) override {
-    tls_slot_->getTyped<ThreadLocalStreamer>().send(message, log_name);
+            const std::string& log_name, const std::string& method_name) override {
+    tls_slot_->getTyped<ThreadLocalStreamer>().send(message, log_name, method_name);
   }
 
 private:
@@ -98,7 +98,7 @@ private:
   struct ThreadLocalStreamer : public ThreadLocal::ThreadLocalObject {
     ThreadLocalStreamer(const SharedStateSharedPtr& shared_state);
     void send(envoy::service::accesslog::v2::StreamAccessLogsMessage& message,
-              const std::string& log_name);
+              const std::string& log_name, const std::string& method_name);
 
     Grpc::AsyncClientPtr client_;
     std::unordered_map<std::string, ThreadLocalStream> stream_map_;

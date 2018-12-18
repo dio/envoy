@@ -134,6 +134,8 @@ void AsyncStreamImpl::sendData(Buffer::Instance& data, bool end_stream) {
     buffered_body_->add(data);
   }
 
+  std::cerr << data.length() << "\n";
+
   router_.decodeData(data, end_stream);
   closeLocal(end_stream);
 }
