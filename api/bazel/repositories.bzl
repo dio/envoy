@@ -7,6 +7,9 @@ GOGOPROTO_SHA256 = "9f8c2ad49849ab063cd9fef67e77d49606640044227ecf7f3617ea2c92ef
 PGV_RELEASE = "0.0.11"
 PGV_SHA256 = "d92c7f22929f495cf9f7d825c44f9190eda1d8256af321e3e8692570181b28a6"
 
+SKYWALKING_GIT_SHA = "b66fa070fd647662f06497e4ed3657eb258cb6e9"
+SKYWALKING_SHA256 = "67557b98d3fa10244ac2a5323ed5d0f6e5771c980c2422da54789b5a3b1af4f7"
+
 GOOGLEAPIS_GIT_SHA = "d642131a6e6582fc226caf9893cb7fe7885b3411"  # May 23, 2018
 GOOGLEAPIS_SHA = "16f5b2e8bf1e747a32f9a62e211f8f33c94645492e9bbd72458061d9a9de1f63"
 
@@ -30,6 +33,26 @@ def api_dependencies():
         sha256 = PGV_SHA256,
         strip_prefix = "protoc-gen-validate-" + PGV_RELEASE,
         url = "https://github.com/lyft/protoc-gen-validate/archive/v" + PGV_RELEASE + ".tar.gz",
+    )
+    http_archive(
+        name = "com_apache_incubator_skywalking",
+        sha256 = SKYWALKING_SHA256,
+        strip_prefix = "incubator-skywalking-data-collect-protocol-" + SKYWALKING_GIT_SHA,
+        url = "https://github.com/apache/incubator-skywalking-data-collect-protocol/archive/" + SKYWALKING_GIT_SHA + ".tar.gz",
+        build_file_content = """
+load("@com_google_protobuf//:protobuf.bzl", "cc_proto_library")
+
+cc_proto_library(
+    name = "data_cc",
+    srcs = [
+        "common/common.proto",
+        "service-mesh-probe/service-mesh.proto",
+    ],
+    default_runtime = "@com_google_protobuf//:protobuf",
+    protoc = "@com_google_protobuf//:protoc",
+    visibility = ["//visibility:public"],
+)
+        """,
     )
     http_archive(
         name = "googleapis",

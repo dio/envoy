@@ -18,6 +18,8 @@ public:
   const std::string File = "envoy.file_access_log";
   // HTTP gRPC access log
   const std::string HttpGrpc = "envoy.http_grpc_access_log";
+  // Skywalking gRPC access log
+  const std::string Skywalking = "envoy.skywalking_access_log";
 };
 
 typedef ConstSingleton<AccessLogNameValues> AccessLogNames;
