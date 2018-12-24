@@ -6,6 +6,7 @@ EXTENSIONS = {
 
     "envoy.access_loggers.file":                        "//source/extensions/access_loggers/file:config",
     "envoy.access_loggers.http_grpc":                   "//source/extensions/access_loggers/http_grpc:config",
+    "envoy.access_loggers.skywalking":                  "//source/extensions/access_loggers/skywalking:config",
 
     #
     # gRPC Credentials Plugins
