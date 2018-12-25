@@ -157,26 +157,30 @@ void SkywalkingAccessLog::responseFlagsToAccessLogResponseFlags(
 void SkywalkingAccessLog::log(const Http::HeaderMap* request_headers, const Http::HeaderMap*,
                               const Http::HeaderMap*, const StreamInfo::StreamInfo& stream_info) {
   ServiceMeshMetric message;
-  const auto& source = stream_info.upstreamHost()->cluster().name();
-  message.set_starttime(std::chrono::duration_cast<std::chrono::milliseconds>(
-                            stream_info.startTime().time_since_epoch())
-                            .count());
-  message.set_endtime(std::chrono::duration_cast<std::chrono::milliseconds>(
-                          stream_info.lastUpstreamRxByteReceived().value())
-                          .count());
-  // TODO(dio): if this is a client, set source as self.
-  message.set_sourceservicename("svc1");
-  message.set_sourceserviceinstance("svc1");
-  message.set_destservicename(source);
-  message.set_destserviceinstance(source);
+  const auto& upstream = stream_info.upstreamHost();
+  const auto& start_time = std::chrono::duration_cast<std::chrono::milliseconds>(
+                               stream_info.startTime().time_since_epoch())
+                               .count();
+  const auto& latency = std::chrono::duration_cast<std::chrono::milliseconds>(
+                            stream_info.lastUpstreamRxByteReceived().value())
+                            .count();
+  message.set_starttime(start_time);
+  message.set_endtime(start_time + latency);
+
+  // TODO(dio): if this is a client, set source as self. Or get from header.
+  message.set_sourceservicename(config_.common_config().log_name());
+  message.set_sourceserviceinstance(stream_info.downstreamLocalAddress()->asString()); // host
+  message.set_destservicename(upstream->cluster().name());
+  message.set_destserviceinstance(upstream->address()->asString()); // host
   message.set_endpoint(request_headers->Path()->value().c_str());
-  message.set_latency(1000);
-  message.set_status(true);
+  message.set_latency(latency);
   message.set_protocol(Protocol::HTTP);
   message.set_detectpoint(DetectPoint::server);
 
   if (stream_info.responseCode()) {
     message.set_responsecode(stream_info.responseCode().value());
+    // TODO(dio): if stream_info.responseCode().value() in certain range do set the following:
+    message.set_status(true);
   }
 
   // TODO(dio): Consider batching multiple logs and flushing.
