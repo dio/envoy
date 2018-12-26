@@ -3,6 +3,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "common/common/assert.h"
+#include "common/grpc/common.h"
 #include "common/http/header_map_impl.h"
 #include "common/network/utility.h"
 #include "common/stream_info/utility.h"
@@ -164,25 +165,26 @@ void SkywalkingAccessLog::log(const Http::HeaderMap* request_headers, const Http
   const auto& latency = std::chrono::duration_cast<std::chrono::milliseconds>(
                             stream_info.lastUpstreamRxByteReceived().value())
                             .count();
+  const auto* skywalking_source_ = request_headers->get(source_header_);
+  const auto source_service_ = skywalking_source_ == nullptr ? config_.common_config().log_name()
+                                                             : skywalking_source_->value().c_str();
   message.set_starttime(start_time);
   message.set_endtime(start_time + latency);
-
-  // TODO(dio): if this is a client, set source as self. Or get from header.
-  message.set_sourceservicename(config_.common_config().log_name());
-  message.set_sourceserviceinstance(stream_info.downstreamLocalAddress()->asString()); // host
+  message.set_sourceservicename(source_service_);
+  message.set_sourceserviceinstance(stream_info.downstreamLocalAddress()->asString());
   message.set_destservicename(upstream->cluster().name());
-  message.set_destserviceinstance(upstream->address()->asString()); // host
+  message.set_destserviceinstance(upstream->address()->asString());
   message.set_endpoint(request_headers->Path()->value().c_str());
   message.set_latency(latency);
-  message.set_protocol(Protocol::HTTP);
-  message.set_detectpoint(DetectPoint::server);
-
-  if (stream_info.responseCode()) {
-    message.set_responsecode(stream_info.responseCode().value());
-    // TODO(dio): if stream_info.responseCode().value() in certain range do set the following:
-    message.set_status(true);
+  message.set_protocol(Grpc::Common::hasGrpcContentType(*request_headers) ? Protocol::gRPC
+                                                                          : Protocol::HTTP);
+  message.set_detectpoint(skywalking_source_ == nullptr ? DetectPoint::client
+                                                        : DetectPoint::server);
+  if (stream_info.responseCode().has_value()) {
+    const auto status_code = stream_info.responseCode().value();
+    message.set_responsecode(status_code);
+    message.set_status(status_code >= 200 && status_code < 400);
   }
-
   // TODO(dio): Consider batching multiple logs and flushing.
   skywalking_access_log_streamer_->send(message, config_.common_config().log_name());
 }
