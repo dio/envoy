@@ -1,5 +1,3 @@
-package(default_visibility = ["//visibility:public"])
-
 load("//bazel:api_build_system.bzl", "api_proto_library_internal")
 
 licenses(["notice"])  # Apache 2
@@ -7,6 +5,7 @@ licenses(["notice"])  # Apache 2
 api_proto_library_internal(
     name = "als",
     srcs = ["als.proto"],
+    visibility = ["//visibility:public"],
     deps = [
         "//envoy/api/v2/core:grpc_service",
     ],
