@@ -1,3 +1,5 @@
+package(default_visibility = ["//visibility:public"])
+
 load("//bazel:api_build_system.bzl", "api_proto_library_internal")
 
 licenses(["notice"])  # Apache 2
