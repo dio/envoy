@@ -158,33 +158,47 @@ void SkywalkingAccessLog::responseFlagsToAccessLogResponseFlags(
 void SkywalkingAccessLog::log(const Http::HeaderMap* request_headers, const Http::HeaderMap*,
                               const Http::HeaderMap*, const StreamInfo::StreamInfo& stream_info) {
   ServiceMeshMetric message;
-  const auto& upstream = stream_info.upstreamHost();
   const auto& start_time = std::chrono::duration_cast<std::chrono::milliseconds>(
                                stream_info.startTime().time_since_epoch())
                                .count();
-  const auto& latency = std::chrono::duration_cast<std::chrono::milliseconds>(
-                            stream_info.lastUpstreamRxByteReceived().value())
-                            .count();
-  const auto* skywalking_source_ = request_headers->get(source_header_);
-  const auto source_service_ = skywalking_source_ == nullptr ? config_.common_config().log_name()
-                                                             : skywalking_source_->value().c_str();
   message.set_starttime(start_time);
+
+  const auto latency = stream_info.lastUpstreamRxByteReceived().has_value() ?
+  // TODO(dio): find a better way to get latency, from end time?
+  std::chrono::duration_cast<std::chrono::milliseconds>(
+                  stream_info.lastUpstreamRxByteReceived().value())
+                  .count() : 0;
   message.set_endtime(start_time + latency);
-  message.set_sourceservicename(source_service_);
-  message.set_sourceserviceinstance(stream_info.downstreamLocalAddress()->asString());
-  message.set_destservicename(upstream->cluster().name());
-  message.set_destserviceinstance(upstream->address()->asString());
+
+  const auto* skywalking_source = request_headers->get(source_header_);
+  message.set_sourceservicename(skywalking_source == nullptr
+                                     ? config_.common_config().log_name().c_str()
+                                     : skywalking_source->value().c_str());
+
+  const auto& downstream_local_address = stream_info.downstreamLocalAddress();
+  if (downstream_local_address != nullptr) {
+    message.set_sourceserviceinstance(downstream_local_address->asString().c_str());
+  }
+
+  const auto& upstream = stream_info.upstreamHost();
+  if (upstream != nullptr) {
+    message.set_destservicename(upstream->cluster().name().c_str());
+    message.set_destserviceinstance(upstream->address()->asString().c_str());
+  }
+
   message.set_endpoint(request_headers->Path()->value().c_str());
   message.set_latency(latency);
-  message.set_protocol(Grpc::Common::hasGrpcContentType(*request_headers) ? Protocol::gRPC
-                                                                          : Protocol::HTTP);
-  message.set_detectpoint(skywalking_source_ == nullptr ? DetectPoint::client
-                                                        : DetectPoint::server);
+
   if (stream_info.responseCode().has_value()) {
     const auto status_code = stream_info.responseCode().value();
     message.set_responsecode(status_code);
     message.set_status(status_code >= 200 && status_code < 400);
   }
+
+  message.set_protocol(Grpc::Common::hasGrpcContentType(*request_headers) ? Protocol::gRPC
+                                                                          : Protocol::HTTP);
+  message.set_detectpoint(skywalking_source == nullptr ? DetectPoint::client : DetectPoint::server);
+
   // TODO(dio): Consider batching multiple logs and flushing.
   skywalking_access_log_streamer_->send(message, config_.common_config().log_name());
 }
