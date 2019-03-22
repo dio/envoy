@@ -31,6 +31,11 @@ def api_dependencies():
         locations = REPOSITORY_LOCATIONS,
         build_file_content = OPENCENSUSTRACE_BUILD_CONTENT,
     )
+    envoy_http_archive(
+        name = "com_github_apache_incubator_skywalking_data_collect_protocol",
+        locations = REPOSITORY_LOCATIONS,
+        build_file_content = SKYWALKINGDATACOLLECTPROTOCOL_BUILD_CONTENT,
+    )
 
 GOOGLEAPIS_BUILD_CONTENT = """
 load("@com_google_protobuf//:protobuf.bzl", "cc_proto_library", "py_proto_library")
@@ -282,6 +287,21 @@ go_proto_library(
     name = "trace_model_go_proto",
     importpath = "trace_model",
     proto = ":trace_model",
+    visibility = ["//visibility:public"],
+)
+"""
+
+SKYWALKINGDATACOLLECTPROTOCOL_BUILD_CONTENT = """
+load("@com_google_protobuf//:protobuf.bzl", "cc_proto_library")
+
+cc_proto_library(
+    name = "data_cc",
+    srcs = [
+        "common/common.proto",
+        "service-mesh-probe/service-mesh.proto",
+    ],
+    default_runtime = "@com_google_protobuf//:protobuf",
+    protoc = "@com_google_protobuf//:protoc",
     visibility = ["//visibility:public"],
 )
 """
