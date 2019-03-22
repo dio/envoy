@@ -163,17 +163,19 @@ void SkywalkingAccessLog::log(const Http::HeaderMap* request_headers, const Http
                                .count();
   message.set_starttime(start_time);
 
-  const auto latency = stream_info.lastUpstreamRxByteReceived().has_value() ?
-  // TODO(dio): find a better way to get latency, from end time?
-  std::chrono::duration_cast<std::chrono::milliseconds>(
-                  stream_info.lastUpstreamRxByteReceived().value())
-                  .count() : 0;
+  const auto latency = stream_info.lastUpstreamRxByteReceived().has_value()
+                           ?
+                           // TODO(dio): find a better way to get latency, from end time?
+                           std::chrono::duration_cast<std::chrono::milliseconds>(
+                               stream_info.lastUpstreamRxByteReceived().value())
+                               .count()
+                           : 0;
   message.set_endtime(start_time + latency);
 
   const auto* skywalking_source = request_headers->get(source_header_);
   message.set_sourceservicename(skywalking_source == nullptr
-                                     ? config_.common_config().log_name().c_str()
-                                     : skywalking_source->value().c_str());
+                                    ? config_.common_config().log_name().c_str()
+                                    : skywalking_source->value().c_str());
 
   const auto& downstream_local_address = stream_info.downstreamLocalAddress();
   if (downstream_local_address != nullptr) {
