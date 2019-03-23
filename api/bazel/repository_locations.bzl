@@ -54,6 +54,6 @@ REPOSITORY_LOCATIONS = dict(
     com_github_apache_incubator_skywalking_data_collect_protocol = dict(
         sha256 = SKYWALKING_SHA256,
         strip_prefix = "incubator-skywalking-data-collect-protocol-" + SKYWALKING_GIT_SHA,
-        urls = ["https://github.com/apache/incubator-skywalking-data-collect-protocol/archive/v" + SKYWALKING_GIT_SHA + ".tar.gz"],
+        urls = ["https://github.com/apache/incubator-skywalking-data-collect-protocol/archive/" + SKYWALKING_GIT_SHA + ".tar.gz"],
     ),
 )
