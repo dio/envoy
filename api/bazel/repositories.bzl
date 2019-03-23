@@ -293,7 +293,8 @@ go_proto_library(
 
 SKYWALKINGDATACOLLECTPROTOCOL_BUILD_CONTENT = """
 load("@com_google_protobuf//:protobuf.bzl", "cc_proto_library")
- cc_proto_library(
+
+cc_proto_library(
     name = "data_cc",
     srcs = [
         "common/common.proto",
