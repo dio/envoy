@@ -1,6 +1,6 @@
 licenses(["notice"])  # Apache 2
 
- # Access log implementation that writes to a Skywalking service.
+# Access log implementation that writes to a Skywalking service.
 # Public docs: TODO(dio): Docs needed.
 
  load(
@@ -9,9 +9,9 @@ licenses(["notice"])  # Apache 2
     "envoy_package",
 )
 
- envoy_package()
+envoy_package()
 
- envoy_cc_library(
+envoy_cc_library(
     name = "skywalking_access_log_lib",
     srcs = ["skywalking_access_log_impl.cc"],
     hdrs = ["skywalking_access_log_impl.h"],
@@ -32,7 +32,7 @@ licenses(["notice"])  # Apache 2
     ],
 )
 
- envoy_cc_library(
+envoy_cc_library(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
