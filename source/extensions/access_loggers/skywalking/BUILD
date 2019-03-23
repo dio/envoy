@@ -3,7 +3,7 @@ licenses(["notice"])  # Apache 2
 # Access log implementation that writes to a Skywalking service.
 # Public docs: TODO(dio): Docs needed.
 
- load(
+load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
