@@ -16,6 +16,9 @@ GOOGLEAPIS_SHA = "16f5b2e8bf1e747a32f9a62e211f8f33c94645492e9bbd72458061d9a9de1f
 PROMETHEUS_GIT_SHA = "99fa1f4be8e564e8a6b613da7fa6f46c9edafc6c"  # Nov 17, 2017
 PROMETHEUS_SHA = "783bdaf8ee0464b35ec0c8704871e1e72afa0005c3f3587f65d9d6694bf3911b"
 
+SKYWALKING_GIT_SHA = "b66fa070fd647662f06497e4ed3657eb258cb6e9"
+SKYWALKING_SHA256 = "67557b98d3fa10244ac2a5323ed5d0f6e5771c980c2422da54789b5a3b1af4f7"
+
 REPOSITORY_LOCATIONS = dict(
     bazel_skylib = dict(
         sha256 = BAZEL_SKYLIB_SHA256,
@@ -48,4 +51,9 @@ REPOSITORY_LOCATIONS = dict(
         strip_prefix = "opencensus-proto-" + OPENCENSUS_RELEASE + "/src/opencensus/proto/trace/v1",
         urls = ["https://github.com/census-instrumentation/opencensus-proto/archive/v" + OPENCENSUS_RELEASE + ".tar.gz"],
     ),
+    com_github_apache_incubator_skywalking_data_collect_protocol = dict(
+        sha256 = SKYWALKING_SHA256,
+        strip_prefix = "incubator-skywalking-data-collect-protocol-" + SKYWALKING_GIT_SHA,
+        urls = ["https://github.com/apache/incubator-skywalking-data-collect-protocol/archive/" + SKYWALKING_GIT_SHA + ".tar.gz"],
+    )
 )
