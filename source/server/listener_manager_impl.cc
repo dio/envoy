@@ -727,6 +727,32 @@ ListenerManagerStats ListenerManagerImpl::generateStats(Stats::Scope& scope) {
 
 bool ListenerManagerImpl::addOrUpdateListener(const envoy::api::v2::Listener& config,
                                               const std::string& version_info, bool modifiable) {
+
+  // Do mutation for each config of http_connection_manager found.
+  envoy::api::v2::Listener listener;
+  listener.MergeFrom(config);
+
+  for (ssize_t i = 0; i < listener.filter_chains_size(); ++i) {
+    auto* filter_chain = listener.mutable_filter_chains(i);
+    for (ssize_t j = 0; j < filter_chain->filters_size(); ++j) {
+      auto* filter = filter_chain->mutable_filters(j);
+      if (filter->name() == "envoy.http_connection_manager") {
+        envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager hcm;
+        MessageUtil::jsonConvert(filter->config(), hcm);
+
+        auto* access_log = hcm.add_access_log();
+        access_log->set_name("envoy.skywalking_access_log");
+        envoy::config::accesslog::v2::HttpGrpcAccessLogConfig access_log_config;
+        auto* common_config = access_log_config.mutable_common_config();
+        common_config->set_log_name("skywalking");
+        common_config->mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("skywalking");
+        MessageUtil::jsonConvert(access_log_config, *access_log->mutable_config());
+
+        MessageUtil::jsonConvert(hcm, *filter->mutable_config());
+      }
+    }
+  }
+
   std::string name;
   if (!config.name().empty()) {
     name = config.name();
