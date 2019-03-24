@@ -1,5 +1,6 @@
 #include "server/listener_manager_impl.h"
 
+#include "envoy/config/accesslog/v2/als.pb.h"
 #include "envoy/admin/v2alpha/config_dump.pb.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/transport_socket_config.h"
@@ -776,7 +777,7 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::api::v2::Listener& co
   }
 
   ListenerImplPtr new_listener(
-      new ListenerImpl(config, version_info, *this, name, modifiable, workers_started_, hash));
+      new ListenerImpl(listener, version_info, *this, name, modifiable, workers_started_, hash));
   ListenerImpl& new_listener_ref = *new_listener;
 
   // We mandate that a listener with the same name must have the same configured address. This

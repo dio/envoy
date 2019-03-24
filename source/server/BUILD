@@ -241,6 +241,7 @@ envoy_cc_library(
         "//source/extensions/transport_sockets/tls:context_lib",
         "@envoy_api//envoy/admin/v2alpha:config_dump_cc",
         "@envoy_api//envoy/api/v2:lds_cc",
+        "@envoy_api//envoy/config/accesslog/v2:als_cc",
     ],
 )
 
