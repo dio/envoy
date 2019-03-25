@@ -1,7 +1,7 @@
 #include "server/listener_manager_impl.h"
 
-#include "envoy/config/accesslog/v2/als.pb.h"
 #include "envoy/admin/v2alpha/config_dump.pb.h"
+#include "envoy/config/accesslog/v2/als.pb.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/stats/scope.h"

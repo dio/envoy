@@ -1,5 +1,6 @@
-#include <stdlib.h>
 #include "common/aws/region_provider_impl.h"
+
+#include <stdlib.h>
 
 namespace Envoy {
 namespace Aws {

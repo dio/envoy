@@ -10,6 +10,9 @@
 #include "common/http/utility.h"
 #include "common/json/json_loader.h"
 
+#include "absl/time/clock.h"
+#include "absl/time/time.h"
+
 namespace Envoy {
 namespace Aws {
 namespace Auth {

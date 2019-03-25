@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+
 #include "common/aws/region_provider.h"
 #include "common/common/logger.h"
 
