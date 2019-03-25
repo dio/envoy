@@ -2,6 +2,7 @@
 
 #include "envoy/api/api.h"
 #include "envoy/api/v2/core/grpc_service.pb.h"
+#include "envoy/grpc/google_grpc_creds.h"
 
 #include "grpcpp/grpcpp.h"
 
@@ -63,6 +64,20 @@ public:
   static std::shared_ptr<grpc::ChannelCredentials>
   defaultChannelCredentials(const envoy::api::v2::core::GrpcService& grpc_service_config,
                             Api::Api& api);
+};
+
+class GoogleGrpcCredentialsFactoryContextImpl : public GoogleGrpcCredentialsFactoryContext {
+public:
+  GoogleGrpcCredentialsFactoryContextImpl(Api::Api& api, Event::TimeSystem& time_system)
+      : api_(api), time_system_(time_system) {}
+
+  Api::Api& api() override { return api_; }
+
+  Event::TimeSystem& timeSystem() override { return time_system_; }
+
+private:
+  Api::Api& api_;
+  Event::TimeSystem& time_system_;
 };
 
 } // namespace Grpc

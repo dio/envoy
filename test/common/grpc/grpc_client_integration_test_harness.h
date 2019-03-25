@@ -307,8 +307,16 @@ public:
 #ifdef ENVOY_GOOGLE_GRPC
     google_tls_ = std::make_unique<GoogleAsyncClientThreadLocal>(*api_);
     GoogleGenericStubFactory stub_factory;
+<<<<<<< HEAD
     return std::make_unique<GoogleAsyncClientImpl>(*dispatcher_, *google_tls_, stub_factory,
                                                    stats_scope_, createGoogleGrpcConfig(), *api_);
+||||||| merged common ancestors
+    return std::make_unique<GoogleAsyncClientImpl>(dispatcher_, *google_tls_, stub_factory,
+                                                   stats_scope_, createGoogleGrpcConfig());
+=======
+    return std::make_unique<GoogleAsyncClientImpl>(*api_, dispatcher_, *google_tls_, stub_factory,
+                                                   stats_scope_, createGoogleGrpcConfig());
+>>>>>>> lavignes-aws-sigv4-auth
 #else
     NOT_REACHED_GCOVR_EXCL_LINE;
 #endif

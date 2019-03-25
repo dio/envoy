@@ -33,6 +33,7 @@ Version history
   and the number of faults the overflowed.
 * governance: extending Envoy deprecation policy from 1 release (0-3 months) to 2 releases (3-6 months).
 * health check: expected response codes in http health checks are now :ref:`configurable <envoy_api_msg_core.HealthCheck.HttpHealthCheck>`.
+* grpc: added AWS IAM grpc credentials extension for AWS-managed xDS.
 * http: added new grpc_http1_reverse_bridge filter for converting gRPC requests into HTTP/1.1 requests.
 * http: fixed a bug where Content-Length:0 was added to HTTP/1 204 responses.
 * outlier_detection: added support for :ref:`outlier detection event protobuf-based logging <arch_overview_outlier_detection_logging>`.

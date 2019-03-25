@@ -11,6 +11,15 @@
 namespace Envoy {
 namespace Grpc {
 
+class GoogleGrpcCredentialsFactoryContext {
+public:
+  virtual ~GoogleGrpcCredentialsFactoryContext() = default;
+
+  virtual Api::Api& api() PURE;
+
+  virtual Event::TimeSystem& timeSystem() PURE;
+};
+
 /**
  * Interface for all Google gRPC credentials factories.
  */

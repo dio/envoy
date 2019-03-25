@@ -55,6 +55,7 @@ GoogleAsyncClientFactoryImpl::GoogleAsyncClientFactoryImpl(
       config_(config), api_(api) {
 
 #ifndef ENVOY_GOOGLE_GRPC
+  UNREFERENCED_PARAMETER(api_);
   UNREFERENCED_PARAMETER(tls_);
   UNREFERENCED_PARAMETER(google_tls_slot_);
   UNREFERENCED_PARAMETER(scope_);

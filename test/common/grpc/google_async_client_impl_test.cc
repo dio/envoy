@@ -55,8 +55,16 @@ public:
     google_grpc->set_target_uri("fake_address");
     google_grpc->set_stat_prefix("test_cluster");
     tls_ = std::make_unique<GoogleAsyncClientThreadLocal>(*api_);
+<<<<<<< HEAD
     grpc_client_ = std::make_unique<GoogleAsyncClientImpl>(*dispatcher_, *tls_, stub_factory_,
                                                            scope_, config, *api_);
+||||||| merged common ancestors
+    grpc_client_ =
+        std::make_unique<GoogleAsyncClientImpl>(dispatcher_, *tls_, stub_factory_, scope_, config);
+=======
+    grpc_client_ = std::make_unique<GoogleAsyncClientImpl>(*api_, dispatcher_, *tls_, stub_factory_,
+                                                           scope_, config);
+>>>>>>> lavignes-aws-sigv4-auth
   }
 
   DangerousDeprecatedTestTime test_time_;
