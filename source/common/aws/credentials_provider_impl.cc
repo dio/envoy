@@ -178,11 +178,16 @@ void TaskRoleCredentialsProvider::refresh() {
   }
   const auto expiration = document_json->getString(EXPIRATION, "");
   if (!expiration.empty()) {
-    std::tm timestamp{};
-    if (strptime(expiration.c_str(), EXPIRATION_FORMAT, &timestamp) ==
-        (expiration.c_str() + expiration.size())) {
+    absl::Time timestamp;
+    std::string parse_error;
+    if (absl::ParseTime(EXPIRATION_FORMAT, expiration.c_str(), &timestamp, &parse_error)) {
       ENVOY_LOG(debug, "Found task role credential {}={}", EXPIRATION, expiration);
-      expiration_time_ = SystemTime::clock::from_time_t(std::mktime(&timestamp));
+
+      // TODO(dio): to use MonotonicTime time for tracking the expiration_time_.
+      expiration_time_ = SystemTime(std::chrono::milliseconds(absl::ToUnixMillis(timestamp)));
+    } else {
+      ENVOY_LOG(debug, "Failed to parse expiration time {} as {}, since {}", expiration, EXPIRATION,
+                parse_error);
     }
   }
   cached_credentials_ = credentials;
