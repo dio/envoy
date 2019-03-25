@@ -1,7 +1,7 @@
 #pragma once
 
+#include <string>
 #include "envoy/common/pure.h"
-
 #include "absl/types/optional.h"
 
 namespace Envoy {
@@ -12,14 +12,16 @@ class RegionProvider {
 public:
   virtual ~RegionProvider() = default;
 
-  virtual absl::optional<std::string> getRegion() PURE;
+  virtual const absl::optional<std::string> getRegion() PURE;
 };
 
 class StaticRegionProvider : public RegionProvider {
 public:
   StaticRegionProvider(const std::string& region) : region_(region) {}
 
-  absl::optional<std::string> getRegion() override { return absl::optional<std::string>(region_); }
+  const absl::optional<std::string> getRegion() override {
+    return absl::optional<std::string>(region_);
+  }
 
 private:
   const std::string region_;

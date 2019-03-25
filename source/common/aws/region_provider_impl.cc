@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include "common/aws/region_provider_impl.h"
 
 namespace Envoy {
@@ -6,7 +7,7 @@ namespace Auth {
 
 static const char AWS_REGION[] = "AWS_REGION";
 
-absl::optional<std::string> EnvironmentRegionProvider::getRegion() {
+const absl::optional<std::string> EnvironmentRegionProvider::getRegion() {
   const auto region = std::getenv(AWS_REGION);
   if (region == nullptr) {
     return absl::optional<std::string>();
