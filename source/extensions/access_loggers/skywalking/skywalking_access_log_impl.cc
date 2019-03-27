@@ -203,6 +203,15 @@ void SkywalkingAccessLog::log(const Http::HeaderMap* request_headers, const Http
 
   // TODO(dio): Consider batching multiple logs and flushing.
   skywalking_access_log_streamer_->send(message, config_.common_config().log_name());
+
+  // TODO(dio): Make sure we record the data flow from unknown to skywalking.
+  message.set_detectpoint(DetectPoint::server);
+  message.set_sourceservicename("unknown");
+  message.set_sourceserviceinstance("");
+
+  message.set_destservicename("ingress");
+  message.set_destserviceinstance(downstream_local_address->asString().c_str());
+  skywalking_access_log_streamer_->send(message, config_.common_config().log_name());
 }
 
 } // namespace Skywalking
