@@ -209,8 +209,10 @@ void SkywalkingAccessLog::log(const Http::HeaderMap* request_headers, const Http
   message.set_sourceservicename("unknown");
   message.set_sourceserviceinstance("");
 
-  message.set_destservicename("ingress");
-  message.set_destserviceinstance(downstream_local_address->asString().c_str());
+  message.set_destservicename("istio-ingressgateway.smddemo-istio-system");
+  if (downstream_local_address != nullptr) {
+    message.set_destserviceinstance(downstream_local_address->asString().c_str());
+  }
   skywalking_access_log_streamer_->send(message, config_.common_config().log_name());
 }
 
