@@ -1,3 +1,5 @@
+#include <cstdlib>
+
 #include "extensions/access_loggers/skywalking/skywalking_access_log_impl.h"
 
 #include "envoy/upstream/upstream.h"
@@ -7,6 +9,8 @@
 #include "common/http/header_map_impl.h"
 #include "common/network/utility.h"
 #include "common/stream_info/utility.h"
+
+#include "absl/strings/str_cat.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -172,21 +176,13 @@ void SkywalkingAccessLog::log(const Http::HeaderMap* request_headers, const Http
                            : 0;
   message.set_endtime(start_time + latency);
 
-  const auto* skywalking_source = request_headers->get(source_header_);
-  message.set_sourceservicename(skywalking_source == nullptr
-                                    ? config_.common_config().log_name().c_str()
-                                    : skywalking_source->value().c_str());
+  message.set_detectpoint(DetectPoint::server);
+  message.set_sourceservicename("unknown");
+  message.set_sourceserviceinstance("unknown");
 
-  const auto& downstream_local_address = stream_info.downstreamLocalAddress();
-  if (downstream_local_address != nullptr) {
-    message.set_sourceserviceinstance(downstream_local_address->asString().c_str());
-  }
-
-  const auto& upstream = stream_info.upstreamHost();
-  if (upstream != nullptr) {
-    message.set_destservicename(upstream->cluster().name().c_str());
-    message.set_destserviceinstance(upstream->address()->asString().c_str());
-  }
+  message.set_destservicename(absl::StrCat("istio-ingressgateway.", std::getenv("POD_NAMESPACE")));
+  message.set_destserviceinstance(
+      absl::StrCat(std::getenv("POD_NAME"), ".", std::getenv("POD_NAMESPACE")));
 
   message.set_endpoint(request_headers->Path()->value().c_str());
   message.set_latency(latency);
@@ -199,20 +195,7 @@ void SkywalkingAccessLog::log(const Http::HeaderMap* request_headers, const Http
 
   message.set_protocol(Grpc::Common::hasGrpcContentType(*request_headers) ? Protocol::gRPC
                                                                           : Protocol::HTTP);
-  message.set_detectpoint(skywalking_source == nullptr ? DetectPoint::client : DetectPoint::server);
 
-  // TODO(dio): Consider batching multiple logs and flushing.
-  skywalking_access_log_streamer_->send(message, config_.common_config().log_name());
-
-  // TODO(dio): Make sure we record the data flow from unknown to skywalking.
-  message.set_detectpoint(DetectPoint::server);
-  message.set_sourceservicename("unknown");
-  message.set_sourceserviceinstance("");
-
-  message.set_destservicename("istio-ingressgateway.smddemo-istio-system");
-  if (downstream_local_address != nullptr) {
-    message.set_destserviceinstance(downstream_local_address->asString().c_str());
-  }
   skywalking_access_log_streamer_->send(message, config_.common_config().log_name());
 }
 
