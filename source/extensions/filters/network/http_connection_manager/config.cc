@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/config/accesslog/v2/als.pb.h"
 #include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.validate.h"
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/server/admin.h"
@@ -314,6 +315,26 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
         std::make_unique<Http::TracingConnectionManagerConfig>(Http::TracingConnectionManagerConfig{
             tracing_operation_name, request_headers_for_tags, client_sampling, random_sampling,
             overall_sampling, tracing_config.verbose(), max_path_tag_length});
+  }
+
+  for (const auto& field : context_.localInfo().node().metadata().fields()) {
+    if (field.first == "ALS_CLUSTER" &&
+        field.second.kind_case() == ProtobufWkt::Value::kStringValue) {
+      envoy::api::v2::core::GrpcService grpc_service;
+      grpc_service.mutable_envoy_grpc()->set_cluster_name(field.second.string_value());
+      envoy::config::accesslog::v2::CommonGrpcAccessLogConfig grpc_config;
+      grpc_config.set_log_name(field.second.string_value());
+      grpc_config.mutable_grpc_service()->MergeFrom(grpc_service);
+
+      envoy::config::accesslog::v2::HttpGrpcAccessLogConfig http_grpc_config;
+      http_grpc_config.mutable_common_config()->MergeFrom(grpc_config);
+      envoy::config::filter::accesslog::v2::AccessLog als;
+      als.set_name("envoy.http_grpc_access_log");
+      als.mutable_typed_config()->PackFrom(http_grpc_config);
+
+      // Add ALS as one of the access logger.
+      access_logs_.push_back(AccessLog::AccessLogFactory::fromProto(als, context_));
+    }
   }
 
   for (const auto& access_log : config.access_log()) {
