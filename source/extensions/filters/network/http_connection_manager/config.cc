@@ -334,6 +334,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 
       // Add ALS as one of the access logger.
       access_logs_.push_back(AccessLog::AccessLogFactory::fromProto(als, context_));
+      break;
     }
   }
 
