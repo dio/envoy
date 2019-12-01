@@ -1,0 +1,40 @@
+#!/bin/bash
+
+set -e
+
+# This works only on Linux-x86_64 and macOS-x86_64.
+if [[ ( `uname` != "Linux" && `uname` != "Darwin" ) || `uname -m` != "x86_64" ]]; then
+  echo "ERROR: modsecurity is currently supported only on Linux-x86_64 and macOS-x86_64."
+  exit 1
+fi
+
+# Bazel magic.
+SRC=$$(dirname $(rootpath build.sh))
+pushd $$SRC
+
+# TODO(dio): Use git_repository instead.
+GIT_SHA=6624a18a4e7fd9881a7a9b435db3e481e8e986a5
+git init .
+git remote add origin git@github.com:SpiderLabs/ModSecurity.git
+git fetch origin --depth=1 $$GIT_SHA
+git reset --hard FETCH_HEAD
+
+git submodule init
+git submodule update
+
+./build.sh
+./configure --disable-doxygen-doc \
+    --disable-doxygen-html \
+    --without-geoip \
+    --without-maxmind \
+    --without-lmdb \
+    --without-curl \
+    --without-yajl \
+    --without-libxml \
+    --without-lua \
+    --disable-examples \
+    --disable-debug-logs
+make
+popd
+
+mv $$SRC/src/.libs/libmodsecurity.a $(execpath libmodsecurity.a)

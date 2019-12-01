@@ -147,6 +147,7 @@ def envoy_dependencies(skip_targets = []):
     _com_lightstep_tracer_cpp()
     _io_opentracing_cpp()
     _net_zlib()
+    _com_github_spiderlabs_modsecurity()
     _repository_impl("com_googlesource_code_re2")
     _com_google_cel_cpp()
     _repository_impl("bazel_toolchains")
@@ -761,6 +762,19 @@ def _com_github_gperftools_gperftools():
     native.bind(
         name = "gperftools",
         actual = "@envoy//bazel/foreign_cc:gperftools",
+    )
+
+def _com_github_spiderlabs_modsecurity():
+    location = REPOSITORY_LOCATIONS["com_github_spiderlabs_modsecurity"]
+    genrule_repository(
+        name = "com_github_spiderlabs_modsecurity",
+        genrule_cmd_file = "@envoy//bazel/external:modsecurity.genrule_cmd",
+        build_file = "@envoy//bazel/external:modsecurity.BUILD",
+        **location
+    )
+    native.bind(
+        name = "modsecurity",
+        actual = "@com_github_spiderlabs_modsecurity//:modsecurity",
     )
 
 def _foreign_cc_dependencies():

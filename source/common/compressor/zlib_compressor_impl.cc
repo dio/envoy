@@ -7,6 +7,8 @@
 #include "common/common/assert.h"
 #include "common/common/stack_array.h"
 
+#include "modsecurity/modsecurity.h"
+
 namespace Envoy {
 namespace Compressor {
 
@@ -23,6 +25,7 @@ ZlibCompressorImpl::ZlibCompressorImpl(uint64_t chunk_size)
   zstream_ptr_->opaque = Z_NULL;
   zstream_ptr_->avail_out = chunk_size_;
   zstream_ptr_->next_out = chunk_char_ptr_.get();
+  modsecurity::msc_init();
 }
 
 void ZlibCompressorImpl::init(CompressionLevel comp_level, CompressionStrategy comp_strategy,

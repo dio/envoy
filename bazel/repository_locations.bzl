@@ -302,4 +302,9 @@ REPOSITORY_LOCATIONS = dict(
         sha256 = "9ca76ac1c22d9360936006efddf992977ebf8e4788ded8e5f9d511285c9ac774",
         urls = ["https://github.com/fuzzitdev/fuzzit/releases/download/v2.4.76/fuzzit_Linux_x86_64.zip"],
     ),
+    com_github_spiderlabs_modsecurity = dict(
+        sha256 = "a6bcea5c1fc0d3e2e36faf00fd5ca0de5193c05ee5444919396c8bc7ba0dad48",
+        strip_prefix = "ModSecurity-6624a18a4e7fd9881a7a9b435db3e481e8e986a5",
+        urls = ["https://github.com/SpiderLabs/ModSecurity/archive/6624a18a4e7fd9881a7a9b435db3e481e8e986a5.tar.gz"],
+    ),
 )
