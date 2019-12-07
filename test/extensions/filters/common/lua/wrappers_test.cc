@@ -20,7 +20,7 @@ class LuaMetadataMapWrapperTest : public LuaWrappersTestBase<MetadataMapWrapper>
 public:
   void setup(const std::string& script) override {
     LuaWrappersTestBase<MetadataMapWrapper>::setup(script);
-    state_->registerType<MetadataMapIterator>();
+    state_->registerType<MetadataMapIterator>("global");
   }
 
   envoy::api::v2::core::Metadata parseMetadataFromYaml(const std::string& yaml_string) {
@@ -34,7 +34,7 @@ class LuaConnectionWrapperTest : public LuaWrappersTestBase<ConnectionWrapper> {
 public:
   void setup(const std::string& script) override {
     LuaWrappersTestBase<ConnectionWrapper>::setup(script);
-    state_->registerType<SslConnectionWrapper>();
+    state_->registerType<SslConnectionWrapper>("global");
     ssl_ = std::make_shared<NiceMock<Envoy::Ssl::MockConnectionInfo>>();
   }
 

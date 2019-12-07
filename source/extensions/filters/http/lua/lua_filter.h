@@ -3,16 +3,33 @@
 #include "envoy/http/filter.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "envoy/config/filter/http/lua/v2/lua.pb.h"
+
 #include "common/crypto/utility.h"
 
+#include "extensions/filters/common/lua/lua.h"
 #include "extensions/filters/common/lua/wrappers.h"
 #include "extensions/filters/http/lua/wrappers.h"
 #include "extensions/filters/http/well_known_names.h"
+#include <string>
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Lua {
+
+class FilterConfigPerRoute : public Router::RouteSpecificFilterConfig {
+public:
+  FilterConfigPerRoute(const envoy::config::filter::http::lua::v2::LuaPerRoute& config)
+      : disabled_(config.disabled()), name_(config.lua_code_name()) {}
+
+  bool disabled() const { return disabled_; }
+  std::string name() const { return name_; }
+
+private:
+  bool disabled_;
+  const std::string name_;
+};
 
 namespace {
 const ProtobufWkt::Struct& getMetadata(Http::StreamFilterCallbacks* callbacks) {
@@ -291,17 +308,26 @@ private:
  */
 class FilterConfig : Logger::Loggable<Logger::Id::lua> {
 public:
-  FilterConfig(const std::string& lua_code, ThreadLocal::SlotAllocator& tls,
-               Upstream::ClusterManager& cluster_manager);
-  Filters::Common::Lua::CoroutinePtr createCoroutine() { return lua_state_.createCoroutine(); }
-  int requestFunctionRef() { return lua_state_.getGlobalRef(request_function_slot_); }
-  int responseFunctionRef() { return lua_state_.getGlobalRef(response_function_slot_); }
-  uint64_t runtimeBytesUsed() { return lua_state_.runtimeBytesUsed(); }
-  void runtimeGC() { return lua_state_.runtimeGC(); }
+  FilterConfig(const std::vector<Filters::Common::Lua::LuaCode>& codes,
+               ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cluster_manager);
+  Filters::Common::Lua::CoroutinePtr createCoroutine(const std::string& name) {
+    return lua_state_.createCoroutine(name);
+  }
+  int requestFunctionRef(const std::string& name) {
+    return lua_state_.getGlobalRef(name, request_function_slot_);
+  }
+  int responseFunctionRef(const std::string& name) {
+    return lua_state_.getGlobalRef(name, response_function_slot_);
+  }
+  uint64_t runtimeBytesUsed(const std::string& name) { return lua_state_.runtimeBytesUsed(name); }
+  void runtimeGC(const std::string& name) { return lua_state_.runtimeGC(name); }
 
   Upstream::ClusterManager& cluster_manager_;
 
 private:
+  void init(const std::string& name);
+
+  const std::vector<Filters::Common::Lua::LuaCode> codes_;
   Filters::Common::Lua::ThreadLocalState lua_state_;
   uint64_t request_function_slot_;
   uint64_t response_function_slot_;
@@ -328,7 +354,7 @@ public:
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool end_stream) override {
     return doHeaders(request_stream_wrapper_, request_coroutine_, decoder_callbacks_,
-                     config_->requestFunctionRef(), headers, end_stream);
+                     config_->requestFunctionRef("global"), headers, end_stream);
   }
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override {
     return doData(request_stream_wrapper_, data, end_stream);
@@ -346,7 +372,7 @@ public:
   }
   Http::FilterHeadersStatus encodeHeaders(Http::HeaderMap& headers, bool end_stream) override {
     return doHeaders(response_stream_wrapper_, response_coroutine_, encoder_callbacks_,
-                     config_->responseFunctionRef(), headers, end_stream);
+                     config_->responseFunctionRef("global"), headers, end_stream);
   }
   Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override {
     return doData(response_stream_wrapper_, data, end_stream);

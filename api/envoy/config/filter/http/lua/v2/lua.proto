@@ -18,4 +18,18 @@ message Lua {
   // be properly escaped. YAML configuration may be easier to read since YAML supports multi-line
   // strings so complex scripts can be easily expressed inline in the configuration.
   string inline_code = 1 [(validate.rules).string = {min_bytes: 1}];
+
+  map<string, string> inline_codes = 2;
+}
+
+message LuaPerRoute {
+  oneof override {
+    option (validate.required) = true;
+
+    // Disable the buffer filter for this particular vhost or route.
+    bool disabled = 1 [(validate.rules).bool = {const: true}];
+
+    // Use the code in inline codes using this name.
+    string lua_code_name = 2 [(validate.rules).string = {min_bytes: 1}];
+  }
 }
