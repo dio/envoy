@@ -1,17 +1,18 @@
 #pragma once
 
+#include <string>
+
+#include "envoy/config/filter/http/lua/v2/lua.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "envoy/config/filter/http/lua/v2/lua.pb.h"
-
 #include "common/crypto/utility.h"
+#include "common/http/utility.h"
 
 #include "extensions/filters/common/lua/lua.h"
 #include "extensions/filters/common/lua/wrappers.h"
 #include "extensions/filters/http/lua/wrappers.h"
 #include "extensions/filters/http/well_known_names.h"
-#include <string>
 
 namespace Envoy {
 namespace Extensions {
@@ -353,8 +354,10 @@ public:
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool end_stream) override {
+    const auto* config_per_route = decoder_callbacks_.filterConfigPerRoute();
+    const std::string& name = config_per_route == nullptr ? "global" : config_per_route->name();
     return doHeaders(request_stream_wrapper_, request_coroutine_, decoder_callbacks_,
-                     config_->requestFunctionRef("global"), headers, end_stream);
+                     config_->requestFunctionRef(name), headers, end_stream, name);
   }
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override {
     return doData(request_stream_wrapper_, data, end_stream);
@@ -371,8 +374,10 @@ public:
     return Http::FilterHeadersStatus::Continue;
   }
   Http::FilterHeadersStatus encodeHeaders(Http::HeaderMap& headers, bool end_stream) override {
+    const auto* config_per_route = decoder_callbacks_.filterConfigPerRoute();
+    const std::string& name = config_per_route == nullptr ? "global" : config_per_route->name();
     return doHeaders(response_stream_wrapper_, response_coroutine_, encoder_callbacks_,
-                     config_->responseFunctionRef("global"), headers, end_stream);
+                     config_->responseFunctionRef("global"), headers, end_stream, name);
   }
   Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override {
     return doData(response_stream_wrapper_, data, end_stream);
@@ -403,6 +408,19 @@ private:
     const ProtobufWkt::Struct& metadata() const override { return getMetadata(callbacks_); }
     StreamInfo::StreamInfo& streamInfo() override { return callbacks_->streamInfo(); }
     const Network::Connection* connection() const override { return callbacks_->connection(); }
+    const FilterConfigPerRoute* filterConfigPerRoute() {
+      if (callbacks_ == nullptr) {
+        return nullptr;
+      }
+
+      const auto route = callbacks_->route();
+      if (route == nullptr || route->routeEntry() == nullptr) {
+        return nullptr;
+      }
+
+      return Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(
+          HttpFilterNames::get().Lua, route);
+    }
 
     Filter& parent_;
     Http::StreamDecoderFilterCallbacks* callbacks_{};
@@ -433,8 +451,9 @@ private:
   Http::FilterHeadersStatus doHeaders(StreamHandleRef& handle,
                                       Filters::Common::Lua::CoroutinePtr& coroutine,
                                       FilterCallbacks& callbacks, int function_ref,
-                                      Http::HeaderMap& headers, bool end_stream);
-  Http::FilterDataStatus doData(StreamHandleRef& handle, Buffer::Instance& data, bool end_stream);
+                                      Http::HeaderMap& headers, bool end_stream, const std::string &name);
+  Http::FilterDataStatus doData(StreamHandleRef&handle, Buffer::Instance&data, bool end_stream);
+
   Http::FilterTrailersStatus doTrailers(StreamHandleRef& handle, Http::HeaderMap& trailers);
 
   FilterConfigConstSharedPtr config_;

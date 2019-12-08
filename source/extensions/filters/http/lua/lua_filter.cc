@@ -10,6 +10,7 @@
 #include "common/common/enum_to_int.h"
 #include "common/crypto/utility.h"
 #include "common/http/message_impl.h"
+
 #include "extensions/filters/common/lua/lua.h"
 
 namespace Envoy {
@@ -533,12 +534,13 @@ void Filter::onDestroy() {
 Http::FilterHeadersStatus Filter::doHeaders(StreamHandleRef& handle,
                                             Filters::Common::Lua::CoroutinePtr& coroutine,
                                             FilterCallbacks& callbacks, int function_ref,
-                                            Http::HeaderMap& headers, bool end_stream) {
+                                            Http::HeaderMap& headers, bool end_stream,
+                                            const std::string& name) {
   if (function_ref == LUA_REFNIL) {
     return Http::FilterHeadersStatus::Continue;
   }
 
-  coroutine = config_->createCoroutine("global");
+  coroutine = config_->createCoroutine(name);
   handle.reset(StreamHandleWrapper::create(coroutine->luaState(), *coroutine, headers, end_stream,
                                            *this, callbacks),
                true);

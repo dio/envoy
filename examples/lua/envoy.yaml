@@ -4,7 +4,7 @@ static_resources:
     address:
       socket_address:
         address: 0.0.0.0
-        port_value: 80
+        port_value: 8000
     filter_chains:
     - filters:
       - name: envoy.http_connection_manager
@@ -21,39 +21,59 @@ static_resources:
               routes:
               - match:
                   prefix: "/"
-                route: 
+                route:
                   cluster: web_service
+              - match:
+                  prefix: "/hello"
+                route:
+                  cluster: web_service
+                per_filter_config:
+                  envoy.lua:
+                    lua_code_name: hello
           http_filters:
           - name: envoy.lua
             typed_config:
               "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
               inline_code: |
-                local mylibrary = require("lib.mylibrary")
-              
                 function envoy_on_request(request_handle)
-                  request_handle:headers():add("foo", mylibrary.foobar())
+                  request_handle:headers():add("foo", "ok")
                 end
                 function envoy_on_response(response_handle)
                   body_size = response_handle:body():length()
                   response_handle:headers():add("response-body-size", tostring(body_size))
                 end
+              inline_codes:
+                hello: |
+                  function envoy_on_request(request_handle)
+                    request_handle:headers():add("hello", "ok")
+                  end
+                  function envoy_on_response(response_handle)
+                    response_handle:headers():add("hello", "ok")
+                  end
           - name: envoy.router
             typed_config: {}
 
   clusters:
   - name: web_service
     connect_timeout: 0.25s
-    type: strict_dns # static
-    lb_policy: round_robin
+    type: LOGICAL_DNS
+    # Comment out the following line to test on v6 networks
+    dns_lookup_family: V4_ONLY
+    lb_policy: ROUND_ROBIN
     load_assignment:
-      cluster_name: web_service
+      cluster_name: service_google
       endpoints:
       - lb_endpoints:
         - endpoint:
             address:
               socket_address:
-                address: web_service
-                port_value: 80
+                address: www.google.com
+                port_value: 443
+    transport_socket:
+      name: envoy.transport_sockets.tls
+      typed_config:
+        "@type": type.googleapis.com/envoy.api.v2.auth.UpstreamTlsContext
+        sni: www.google.com
 admin:
   access_log_path: "/dev/null"
   address:
