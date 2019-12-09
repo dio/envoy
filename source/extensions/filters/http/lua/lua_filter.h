@@ -22,13 +22,10 @@ namespace Lua {
 class FilterConfigPerRoute : public Router::RouteSpecificFilterConfig {
 public:
   FilterConfigPerRoute(const envoy::config::filter::http::lua::v2::LuaPerRoute& config)
-      : disabled_(config.disabled()), name_(config.lua_code_name()) {}
+      : name_(config.name()) {}
 
-  bool disabled() const { return disabled_; }
   std::string name() const { return name_; }
-
 private:
-  bool disabled_;
   const std::string name_;
 };
 
@@ -354,8 +351,15 @@ public:
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool end_stream) override {
-    const auto* config_per_route = decoder_callbacks_.filterConfigPerRoute();
-    const std::string& name = config_per_route == nullptr ? "global" : config_per_route->name();
+    std::string name = "global";
+    if (decoder_callbacks_.callbacks_->route() && decoder_callbacks_.callbacks_->route()->routeEntry()) {
+      const auto* per_route_settings =
+          Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(
+              Extensions::HttpFilters::HttpFilterNames::get().Lua,
+              decoder_callbacks_.callbacks_->route());
+      name = (per_route_settings ? per_route_settings->name() : name);
+    }
+
     return doHeaders(request_stream_wrapper_, request_coroutine_, decoder_callbacks_,
                      config_->requestFunctionRef(name), headers, end_stream, name);
   }
@@ -374,10 +378,17 @@ public:
     return Http::FilterHeadersStatus::Continue;
   }
   Http::FilterHeadersStatus encodeHeaders(Http::HeaderMap& headers, bool end_stream) override {
-    const auto* config_per_route = decoder_callbacks_.filterConfigPerRoute();
-    const std::string& name = config_per_route == nullptr ? "global" : config_per_route->name();
+    std::string name = "global";
+    if (encoder_callbacks_.callbacks_->route() && encoder_callbacks_.callbacks_->route()->routeEntry()) {
+      const auto* per_route_settings =
+          Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(
+              Extensions::HttpFilters::HttpFilterNames::get().Lua,
+              encoder_callbacks_.callbacks_->route());
+      name = (per_route_settings ? per_route_settings->name() : name);
+    }
+
     return doHeaders(response_stream_wrapper_, response_coroutine_, encoder_callbacks_,
-                     config_->responseFunctionRef("global"), headers, end_stream, name);
+                     config_->responseFunctionRef(name), headers, end_stream, name);
   }
   Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override {
     return doData(response_stream_wrapper_, data, end_stream);
@@ -410,11 +421,13 @@ private:
     const Network::Connection* connection() const override { return callbacks_->connection(); }
     const FilterConfigPerRoute* filterConfigPerRoute() {
       if (callbacks_ == nullptr) {
+        std::cerr << "decoder callbacks null" << "\n";
         return nullptr;
       }
 
       const auto route = callbacks_->route();
       if (route == nullptr || route->routeEntry() == nullptr) {
+        std::cerr << "decoder route or routeEntry null" << "\n";
         return nullptr;
       }
 
@@ -441,6 +454,21 @@ private:
     const ProtobufWkt::Struct& metadata() const override { return getMetadata(callbacks_); }
     StreamInfo::StreamInfo& streamInfo() override { return callbacks_->streamInfo(); }
     const Network::Connection* connection() const override { return callbacks_->connection(); }
+    const FilterConfigPerRoute* filterConfigPerRoute() {
+      if (callbacks_ == nullptr) {
+        std::cerr << "encoder callbacks null" << "\n";
+        return nullptr;
+      }
+
+      const auto route = callbacks_->route();
+      if (route == nullptr || route->routeEntry() == nullptr) {
+        std::cerr << "encoder route or routeEntry null" << "\n";
+        return nullptr;
+      }
+
+      return Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(
+          HttpFilterNames::get().Lua, route);
+    }
 
     Filter& parent_;
     Http::StreamEncoderFilterCallbacks* callbacks_{};

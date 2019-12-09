@@ -23,13 +23,6 @@ message Lua {
 }
 
 message LuaPerRoute {
-  oneof override {
-    option (validate.required) = true;
-
-    // Disable the buffer filter for this particular vhost or route.
-    bool disabled = 1 [(validate.rules).bool = {const: true}];
-
-    // Use the code in inline codes using this name.
-    string lua_code_name = 2 [(validate.rules).string = {min_bytes: 1}];
-  }
+  // Use the code in inline codes using this name.
+  string name = 1 [(validate.rules).string = {min_bytes: 1}];
 }

@@ -661,7 +661,9 @@ Utility::resolveMostSpecificPerFilterConfigGeneric(const std::string& filter_nam
 void Utility::traversePerFilterConfigGeneric(
     const std::string& filter_name, const Router::RouteConstSharedPtr& route,
     std::function<void(const Router::RouteSpecificFilterConfig&)> cb) {
+  std::cerr << "filter_name: " << filter_name << "\n";
   if (!route) {
+    std::cerr << "traverse route null\n";
     return;
   }
 
@@ -680,10 +682,13 @@ void Utility::traversePerFilterConfigGeneric(
   }
 
   if (routeEntry != nullptr) {
+    std::cerr << "routeEntry->routeName(): " << routeEntry->routeName() << "\n";
     auto maybe_weighted_cluster_config = routeEntry->perFilterConfig(filter_name);
     if (maybe_weighted_cluster_config != nullptr) {
       cb(*maybe_weighted_cluster_config);
     }
+  } else {
+    std::cerr << "routeEntry nullptr\n";
   }
 }
 

@@ -536,6 +536,7 @@ Http::FilterHeadersStatus Filter::doHeaders(StreamHandleRef& handle,
                                             FilterCallbacks& callbacks, int function_ref,
                                             Http::HeaderMap& headers, bool end_stream,
                                             const std::string& name) {
+  std::cerr << "doHeaders-name: " << name << "\n";
   if (function_ref == LUA_REFNIL) {
     return Http::FilterHeadersStatus::Continue;
   }
