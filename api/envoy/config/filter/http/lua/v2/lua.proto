@@ -6,6 +6,8 @@ option java_package = "io.envoyproxy.envoy.config.filter.http.lua.v2";
 option java_outer_classname = "LuaProto";
 option java_multiple_files = true;
 
+import "envoy/api/v2/core/base.proto";
+
 import "validate/validate.proto";
 
 // [#protodoc-title: Lua]
@@ -18,4 +20,16 @@ message Lua {
   // be properly escaped. YAML configuration may be easier to read since YAML supports multi-line
   // strings so complex scripts can be easily expressed inline in the configuration.
   string inline_code = 1 [(validate.rules).string = {min_bytes: 1}];
+}
+
+message LuaPerRoute {
+  oneof override {
+    option (validate.required) = true;
+
+    // Disable the Lua filter for this particular vhost or route. If disabled is specified in
+    // multiple per-filter-configs, the most specific one will be used.
+    bool disabled = 1 [(validate.rules).bool = {const: true}];
+
+    string inline_code = 2 [(validate.rules).string = {min_bytes: 1}];
+  }
 }

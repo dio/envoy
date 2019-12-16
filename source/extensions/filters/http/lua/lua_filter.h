@@ -1,9 +1,11 @@
 #pragma once
 
+#include "envoy/config/filter/http/lua/v2/lua.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/crypto/utility.h"
+#include "common/http/utility.h"
 
 #include "extensions/filters/common/lua/wrappers.h"
 #include "extensions/filters/http/lua/wrappers.h"
@@ -13,6 +15,8 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Lua {
+
+class FilterConfigPerRoute;
 
 namespace {
 const ProtobufWkt::Struct& getMetadata(Http::StreamFilterCallbacks* callbacks) {
@@ -292,12 +296,14 @@ private:
 class FilterConfig : Logger::Loggable<Logger::Id::lua> {
 public:
   FilterConfig(const std::string& lua_code, ThreadLocal::SlotAllocator& tls,
-               Upstream::ClusterManager& cluster_manager);
-  Filters::Common::Lua::CoroutinePtr createCoroutine() { return lua_state_.createCoroutine(); }
-  int requestFunctionRef() { return lua_state_.getGlobalRef(request_function_slot_); }
-  int responseFunctionRef() { return lua_state_.getGlobalRef(response_function_slot_); }
-  uint64_t runtimeBytesUsed() { return lua_state_.runtimeBytesUsed(); }
-  void runtimeGC() { return lua_state_.runtimeGC(); }
+               Upstream::ClusterManager& cluster_manager, bool all_threads);
+  Filters::Common::Lua::CoroutinePtr createCoroutine() const {
+    return lua_state_.createCoroutine();
+  }
+  int requestFunctionRef() const { return lua_state_.getGlobalRef(request_function_slot_); }
+  int responseFunctionRef() const { return lua_state_.getGlobalRef(response_function_slot_); }
+  uint64_t runtimeBytesUsed() const { return lua_state_.runtimeBytesUsed(); }
+  void runtimeGC() const { return lua_state_.runtimeGC(); }
 
   Upstream::ClusterManager& cluster_manager_;
 
@@ -308,6 +314,19 @@ private:
 };
 
 using FilterConfigConstSharedPtr = std::shared_ptr<FilterConfig>;
+
+class FilterConfigPerRoute : public Router::RouteSpecificFilterConfig, public FilterConfig {
+public:
+  FilterConfigPerRoute(const envoy::config::filter::http::lua::v2::LuaPerRoute& proto_config,
+                       ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cluster_manager)
+      : FilterConfig{proto_config.inline_code(), tls, cluster_manager, false},
+        disabled_{proto_config.disabled()} {}
+
+  bool disabled() const { return disabled_; }
+
+private:
+  bool disabled_;
+};
 
 // TODO(mattklein123): Filter stats.
 
@@ -326,10 +345,7 @@ public:
   void onDestroy() override;
 
   // Http::StreamDecoderFilter
-  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool end_stream) override {
-    return doHeaders(request_stream_wrapper_, request_coroutine_, decoder_callbacks_,
-                     config_->requestFunctionRef(), headers, end_stream);
-  }
+  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override {
     return doData(request_stream_wrapper_, data, end_stream);
   }
@@ -344,10 +360,7 @@ public:
   Http::FilterHeadersStatus encode100ContinueHeaders(Http::HeaderMap&) override {
     return Http::FilterHeadersStatus::Continue;
   }
-  Http::FilterHeadersStatus encodeHeaders(Http::HeaderMap& headers, bool end_stream) override {
-    return doHeaders(response_stream_wrapper_, response_coroutine_, encoder_callbacks_,
-                     config_->responseFunctionRef(), headers, end_stream);
-  }
+  Http::FilterHeadersStatus encodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
   Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override {
     return doData(response_stream_wrapper_, data, end_stream);
   };

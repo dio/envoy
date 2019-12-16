@@ -15,6 +15,18 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Lua {
 
+namespace {
+const FilterConfigPerRoute* getConfigPerRoute(Http::StreamFilterCallbacks* callbacks) {
+  if (callbacks == nullptr || callbacks->route() == nullptr ||
+      callbacks->route()->routeEntry() == nullptr) {
+    return nullptr;
+  }
+
+  return Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(
+      Extensions::HttpFilters::HttpFilterNames::get().Lua, callbacks->route());
+}
+} // namespace
+
 StreamHandleWrapper::StreamHandleWrapper(Filters::Common::Lua::Coroutine& coroutine,
                                          Http::HeaderMap& headers, bool end_stream, Filter& filter,
                                          FilterCallbacks& callbacks)
@@ -485,8 +497,8 @@ int StreamHandleWrapper::luaImportPublicKey(lua_State* state) {
 }
 
 FilterConfig::FilterConfig(const std::string& lua_code, ThreadLocal::SlotAllocator& tls,
-                           Upstream::ClusterManager& cluster_manager)
-    : cluster_manager_(cluster_manager), lua_state_(lua_code, tls) {
+                           Upstream::ClusterManager& cluster_manager, bool all_threads)
+    : cluster_manager_(cluster_manager), lua_state_(lua_code, tls, all_threads) {
   lua_state_.registerType<Filters::Common::Lua::BufferWrapper>();
   lua_state_.registerType<Filters::Common::Lua::MetadataMapWrapper>();
   lua_state_.registerType<Filters::Common::Lua::MetadataMapIterator>();
@@ -521,15 +533,36 @@ void Filter::onDestroy() {
   }
 }
 
-Http::FilterHeadersStatus Filter::doHeaders(StreamHandleRef& handle,
-                                            Filters::Common::Lua::CoroutinePtr& coroutine,
-                                            FilterCallbacks& callbacks, int function_ref,
-                                            Http::HeaderMap& headers, bool end_stream) {
+Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool end_stream) {
+  const auto* config_per_route = getConfigPerRoute(decoder_callbacks_.callbacks_);
+  int function_ref = config_per_route == nullptr ? config_->requestFunctionRef()
+                                                 : config_per_route->requestFunctionRef();
   if (function_ref == LUA_REFNIL) {
     return Http::FilterHeadersStatus::Continue;
   }
 
-  coroutine = config_->createCoroutine();
+  request_coroutine_ = config_per_route == nullptr ? config_->createCoroutine()
+                                                   : config_per_route->createCoroutine();
+  return doHeaders(request_stream_wrapper_, request_coroutine_, decoder_callbacks_, function_ref,
+                   headers, end_stream);
+}
+Http::FilterHeadersStatus Filter::encodeHeaders(Http::HeaderMap& headers, bool end_stream) {
+  const auto* config_per_route = getConfigPerRoute(encoder_callbacks_.callbacks_);
+  int function_ref = config_per_route == nullptr ? config_->responseFunctionRef()
+                                                 : config_per_route->responseFunctionRef();
+  if (function_ref == LUA_REFNIL) {
+    return Http::FilterHeadersStatus::Continue;
+  }
+
+  response_coroutine_ = config_per_route == nullptr ? config_->createCoroutine()
+                                                    : config_per_route->createCoroutine();
+  return doHeaders(response_stream_wrapper_, response_coroutine_, decoder_callbacks_, function_ref,
+                   headers, end_stream);
+}
+Http::FilterHeadersStatus Filter::doHeaders(StreamHandleRef& handle,
+                                            Filters::Common::Lua::CoroutinePtr& coroutine,
+                                            FilterCallbacks& callbacks, int function_ref,
+                                            Http::HeaderMap& headers, bool end_stream) {
   handle.reset(StreamHandleWrapper::create(coroutine->luaState(), *coroutine, headers, end_stream,
                                            *this, callbacks),
                true);

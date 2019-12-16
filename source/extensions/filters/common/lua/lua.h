@@ -360,19 +360,19 @@ using CoroutinePtr = std::unique_ptr<Coroutine>;
  */
 class ThreadLocalState : Logger::Loggable<Logger::Id::lua> {
 public:
-  ThreadLocalState(const std::string& code, ThreadLocal::SlotAllocator& tls);
+  ThreadLocalState(const std::string& code, ThreadLocal::SlotAllocator& tls, bool all_threads);
 
   /**
    * @return CoroutinePtr a new coroutine.
    */
-  CoroutinePtr createCoroutine();
+  CoroutinePtr createCoroutine() const;
 
   /**
    * @return a global reference previously registered via registerGlobal(). This may return
    *         LUA_REFNIL if there was no such global.
    * @param slot supplies the global slot/index to lookup.
    */
-  int getGlobalRef(uint64_t slot);
+  int getGlobalRef(uint64_t slot) const;
 
   /**
    * Register a global for later use.
@@ -386,14 +386,18 @@ public:
    * all threaded workers.
    */
   template <class T> void registerType() {
-    tls_slot_->runOnAllThreads(
-        [this]() { T::registerType(tls_slot_->getTyped<LuaThreadLocal>().state_.get()); });
+    if (local_slot_ != nullptr) {
+      T::registerType(local_slot_->state_.get());
+    } else {
+      tls_slot_->runOnAllThreads(
+          [this]() { T::registerType(tls_slot_->getTyped<LuaThreadLocal>().state_.get()); });
+    }
   }
 
   /**
    * Return the number of bytes used by the runtime.
    */
-  uint64_t runtimeBytesUsed() {
+  uint64_t runtimeBytesUsed() const {
     uint64_t bytes_used =
         lua_gc(tls_slot_->getTyped<LuaThreadLocal>().state_.get(), LUA_GCCOUNT, 0) * 1024;
     bytes_used += lua_gc(tls_slot_->getTyped<LuaThreadLocal>().state_.get(), LUA_GCCOUNTB, 0);
@@ -403,7 +407,9 @@ public:
   /**
    * Force a full runtime GC.
    */
-  void runtimeGC() { lua_gc(tls_slot_->getTyped<LuaThreadLocal>().state_.get(), LUA_GCCOLLECT, 0); }
+  void runtimeGC() const {
+    lua_gc(tls_slot_->getTyped<LuaThreadLocal>().state_.get(), LUA_GCCOLLECT, 0);
+  }
 
 private:
   struct LuaThreadLocal : public ThreadLocal::ThreadLocalObject {
@@ -413,8 +419,14 @@ private:
     std::vector<int> global_slots_;
   };
 
+  void checkAndRegisterGlobal(LuaThreadLocal& tls, const std::string& global);
+
   ThreadLocal::SlotPtr tls_slot_;
   uint64_t current_global_slot_{};
+
+  using LuaThreadLocalPtr = std::unique_ptr<LuaThreadLocal>;
+
+  LuaThreadLocalPtr local_slot_;
 };
 
 /**
