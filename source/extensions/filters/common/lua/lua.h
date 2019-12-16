@@ -360,7 +360,7 @@ using CoroutinePtr = std::unique_ptr<Coroutine>;
  */
 class ThreadLocalState : Logger::Loggable<Logger::Id::lua> {
 public:
-  ThreadLocalState(const std::string& code, ThreadLocal::SlotAllocator& tls, bool all_threads);
+  ThreadLocalState(const std::string& code, ThreadLocal::SlotAllocator& tls);
 
   /**
    * @return CoroutinePtr a new coroutine.
@@ -386,12 +386,8 @@ public:
    * all threaded workers.
    */
   template <class T> void registerType() {
-    if (local_slot_ != nullptr) {
-      T::registerType(local_slot_->state_.get());
-    } else {
-      tls_slot_->runOnAllThreads(
-          [this]() { T::registerType(tls_slot_->getTyped<LuaThreadLocal>().state_.get()); });
-    }
+    tls_slot_->runOnAllThreads(
+        [this]() { T::registerType(tls_slot_->getTyped<LuaThreadLocal>().state_.get()); });
   }
 
   /**
@@ -419,14 +415,8 @@ private:
     std::vector<int> global_slots_;
   };
 
-  void checkAndRegisterGlobal(LuaThreadLocal& tls, const std::string& global);
-
   ThreadLocal::SlotPtr tls_slot_;
   uint64_t current_global_slot_{};
-
-  using LuaThreadLocalPtr = std::unique_ptr<LuaThreadLocal>;
-
-  LuaThreadLocalPtr local_slot_;
 };
 
 /**

@@ -497,8 +497,8 @@ int StreamHandleWrapper::luaImportPublicKey(lua_State* state) {
 }
 
 FilterConfig::FilterConfig(const std::string& lua_code, ThreadLocal::SlotAllocator& tls,
-                           Upstream::ClusterManager& cluster_manager, bool all_threads)
-    : cluster_manager_(cluster_manager), lua_state_(lua_code, tls, all_threads) {
+                           Upstream::ClusterManager& cluster_manager)
+    : cluster_manager_{cluster_manager}, lua_state_{lua_code, tls} {
   lua_state_.registerType<Filters::Common::Lua::BufferWrapper>();
   lua_state_.registerType<Filters::Common::Lua::MetadataMapWrapper>();
   lua_state_.registerType<Filters::Common::Lua::MetadataMapIterator>();

@@ -15,7 +15,7 @@ Http::FilterFactoryCb LuaFilterConfig::createFilterFactoryFromProtoTyped(
     const envoy::config::filter::http::lua::v2::Lua& proto_config, const std::string&,
     Server::Configuration::FactoryContext& context) {
   FilterConfigConstSharedPtr filter_config(new FilterConfig{
-      proto_config.inline_code(), context.threadLocal(), context.clusterManager(), true});
+      proto_config.inline_code(), context.threadLocal(), context.clusterManager()});
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<Filter>(filter_config));
   };

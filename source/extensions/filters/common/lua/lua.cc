@@ -46,9 +46,8 @@ void Coroutine::resume(int num_args, const std::function<void()>& yield_callback
   }
 }
 
-ThreadLocalState::ThreadLocalState(const std::string& code, ThreadLocal::SlotAllocator& tls,
-                                   bool all_threads)
-    : tls_slot_(all_threads ? tls.allocateSlot() : nullptr) {
+ThreadLocalState::ThreadLocalState(const std::string& code, ThreadLocal::SlotAllocator& tls)
+    : tls_slot_{tls.allocateSlot()} {
 
   // First verify that the supplied code can be parsed.
   CSmartPtr<lua_State, lua_close> state(lua_open());
@@ -58,49 +57,36 @@ ThreadLocalState::ThreadLocalState(const std::string& code, ThreadLocal::SlotAll
     throw LuaException(fmt::format("script load error: {}", lua_tostring(state.get(), -1)));
   }
 
-  if (all_threads) {
-    // Now initialize on all threads.
-    tls_slot_->set([code](Event::Dispatcher&) {
-      return ThreadLocal::ThreadLocalObjectSharedPtr{new LuaThreadLocal(code)};
-    });
-  } else {
-    local_slot_.reset(new LuaThreadLocal(code));
-  }
+  // Now initialize on all threads.
+  tls_slot_->set([code](Event::Dispatcher&) {
+    return ThreadLocal::ThreadLocalObjectSharedPtr{new LuaThreadLocal(code)};
+  });
 }
 
 int ThreadLocalState::getGlobalRef(uint64_t slot) const {
-  auto& tls = local_slot_ != nullptr ? *local_slot_ : tls_slot_->getTyped<LuaThreadLocal>();
+  auto& tls = tls_slot_->getTyped<LuaThreadLocal>();
   ASSERT(tls.global_slots_.size() > slot);
   return tls.global_slots_[slot];
 }
 
 uint64_t ThreadLocalState::registerGlobal(const std::string& global) {
-  if (local_slot_ != nullptr) {
-    checkAndRegisterGlobal(*local_slot_, global);
-  } else {
-    tls_slot_->runOnAllThreads([this, global]() {
-      auto& tls = tls_slot_->getTyped<LuaThreadLocal>();
-      checkAndRegisterGlobal(tls, global);
-    });
-  }
+  tls_slot_->runOnAllThreads([this, global]() {
+    auto& tls = tls_slot_->getTyped<LuaThreadLocal>();
+    lua_getglobal(tls.state_.get(), global.c_str());
+    if (lua_isfunction(tls.state_.get(), -1)) {
+      tls.global_slots_.push_back(luaL_ref(tls.state_.get(), LUA_REGISTRYINDEX));
+    } else {
+      ENVOY_LOG(debug, "definition for '{}' not found in script", global);
+      lua_pop(tls.state_.get(), 1);
+      tls.global_slots_.push_back(LUA_REFNIL);
+    }
+  });
 
   return current_global_slot_++;
 }
 
-void ThreadLocalState::checkAndRegisterGlobal(LuaThreadLocal& tls, const std::string& global) {
-  lua_getglobal(tls.state_.get(), global.c_str());
-  if (lua_isfunction(tls.state_.get(), -1)) {
-    tls.global_slots_.push_back(luaL_ref(tls.state_.get(), LUA_REGISTRYINDEX));
-  } else {
-    ENVOY_LOG(debug, "definition for '{}' not found in script", global);
-    lua_pop(tls.state_.get(), 1);
-    tls.global_slots_.push_back(LUA_REFNIL);
-  }
-}
-
 CoroutinePtr ThreadLocalState::createCoroutine() const {
-  lua_State* state = local_slot_ == nullptr ? tls_slot_->getTyped<LuaThreadLocal>().state_.get()
-                                            : local_slot_->state_.get();
+  lua_State* state = tls_slot_->getTyped<LuaThreadLocal>().state_.get();
   return std::make_unique<Coroutine>(std::make_pair(lua_newthread(state), state));
 }
 

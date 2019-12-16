@@ -296,7 +296,7 @@ private:
 class FilterConfig : Logger::Loggable<Logger::Id::lua> {
 public:
   FilterConfig(const std::string& lua_code, ThreadLocal::SlotAllocator& tls,
-               Upstream::ClusterManager& cluster_manager, bool all_threads);
+               Upstream::ClusterManager& cluster_manager);
   Filters::Common::Lua::CoroutinePtr createCoroutine() const {
     return lua_state_.createCoroutine();
   }
@@ -315,17 +315,28 @@ private:
 
 using FilterConfigConstSharedPtr = std::shared_ptr<FilterConfig>;
 
-class FilterConfigPerRoute : public Router::RouteSpecificFilterConfig, public FilterConfig {
+class FilterConfigPerRoute : public Router::RouteSpecificFilterConfig {
 public:
   FilterConfigPerRoute(const envoy::config::filter::http::lua::v2::LuaPerRoute& proto_config,
                        ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cluster_manager)
-      : FilterConfig{proto_config.inline_code(), tls, cluster_manager, false},
-        disabled_{proto_config.disabled()} {}
+      : disabled_{proto_config.disabled()},
+        filter_config_{disabled_
+                           ? nullptr
+                           : new FilterConfig{proto_config.inline_code(), tls, cluster_manager}} {}
+
+  Filters::Common::Lua::CoroutinePtr createCoroutine() const {
+    return filter_config_->createCoroutine();
+  }
+  int requestFunctionRef() const { return filter_config_->requestFunctionRef(); }
+  int responseFunctionRef() const { return filter_config_->responseFunctionRef(); }
+  uint64_t runtimeBytesUsed() const { return filter_config_->runtimeBytesUsed(); }
+  void runtimeGC() const { return filter_config_->runtimeGC(); }
 
   bool disabled() const { return disabled_; }
 
 private:
   bool disabled_;
+  std::unique_ptr<FilterConfig> filter_config_;
 };
 
 // TODO(mattklein123): Filter stats.
