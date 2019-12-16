@@ -1,9 +1,11 @@
 #pragma once
 
 #include "envoy/api/api.h"
+#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/config/filter/http/lua/v2/lua.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/upstream/cluster_manager.h"
+#include "common/config/datasource.h"
 
 #include "common/crypto/utility.h"
 #include "common/http/utility.h"
@@ -18,17 +20,63 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Lua {
 
-class FilterConfigPerRoute : public Router::RouteSpecificFilterConfig {
+class FilterConfigPerRoute : public Router::RouteSpecificFilterConfig,
+                             Logger::Loggable<Logger::Id::lua> {
 public:
-  FilterConfigPerRoute(const envoy::config::filter::http::lua::v2::LuaPerRoute& config)
-      : disabled_(config.disabled()), name_(config.name()) {}
+  FilterConfigPerRoute(const envoy::config::filter::http::lua::v2::LuaPerRoute& config,
+                       Api::Api& api)
+      : disabled_{config.disabled()}, name_{config.name()},
+        source_code_{config.source_code()}, api_{api} {
+
+    std::string code;
+    try {
+      code = Config::DataSource::read(source_code_, true, api_);
+    } catch (EnvoyException& e) {
+    }
+    if (!code.empty()) {
+      thread_.reset(new FilterConfigPerRoute::LuaThread(code));
+      registerTypes();
+    }
+  }
 
   bool disabled() const { return disabled_; }
   std::string name() const { return name_; }
+  std::string inlineCode() const {
+    try {
+      return Config::DataSource::read(source_code_, true, api_);
+    } catch (EnvoyException& e) {
+      return "";
+    }
+  }
+
+  void registerTypes();
+  Filters::Common::Lua::CoroutinePtr createCoroutine() const;
+  uint64_t registerGlobal(const std::string& global);
+
+  int getGlobalRef(uint64_t slot) const { return thread_->global_slots_[slot]; }
+  int requestFunctionRef() const { return getGlobalRef(request_function_slot_); }
+  int responseFunctionRef() const { return getGlobalRef(response_function_slot_); }
 
 private:
+  struct LuaThread {
+    LuaThread(const std::string& code);
+
+    CSmartPtr<lua_State, lua_close> state_;
+    std::vector<int> global_slots_;
+    uint64_t current_global_slot_{0};
+  };
+
+  using LuaThreadPtr = std::unique_ptr<FilterConfigPerRoute::LuaThread>;
+
   bool disabled_;
   const std::string name_;
+  const envoy::api::v2::core::DataSource source_code_;
+  Api::Api& api_;
+
+  LuaThreadPtr thread_;
+
+  uint64_t request_function_slot_;
+  uint64_t response_function_slot_;
 };
 
 namespace {
@@ -383,6 +431,24 @@ public:
       if (config_->hasSourceCode(config_per_route->name())) {
         name = config_per_route->name();
       }
+
+      if (!config_per_route->inlineCode().empty()) {
+        request_coroutine_ = config_per_route->createCoroutine();
+        request_stream_wrapper_.reset(
+            StreamHandleWrapper::create(request_coroutine_->luaState(), *request_coroutine_,
+                                        headers, end_stream, *this, decoder_callbacks_),
+            true);
+
+        Http::FilterHeadersStatus status = Http::FilterHeadersStatus::Continue;
+        try {
+          status = request_stream_wrapper_.get()->start(config_per_route->requestFunctionRef());
+          request_stream_wrapper_.markDead();
+        } catch (const Filters::Common::Lua::LuaException& e) {
+          scriptError(e);
+        }
+
+        return status;
+      }
     }
 
     return doHeaders(request_stream_wrapper_, request_coroutine_, decoder_callbacks_,
@@ -412,6 +478,24 @@ public:
 
       if (config_->hasSourceCode(config_per_route->name())) {
         name = config_per_route->name();
+      }
+
+      if (!config_per_route->inlineCode().empty()) {
+        response_coroutine_ = config_per_route->createCoroutine();
+        response_stream_wrapper_.reset(
+            StreamHandleWrapper::create(response_coroutine_->luaState(), *response_coroutine_,
+                                        headers, end_stream, *this, encoder_callbacks_),
+            true);
+
+        Http::FilterHeadersStatus status = Http::FilterHeadersStatus::Continue;
+        try {
+          status = response_stream_wrapper_.get()->start(config_per_route->responseFunctionRef());
+          response_stream_wrapper_.markDead();
+        } catch (const Filters::Common::Lua::LuaException& e) {
+          scriptError(e);
+        }
+
+        return status;
       }
     }
 

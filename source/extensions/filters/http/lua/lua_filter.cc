@@ -1,6 +1,7 @@
 #include "extensions/filters/http/lua/lua_filter.h"
 
 #include <memory>
+#include <sstream>
 
 #include "envoy/api/api.h"
 #include "envoy/http/codes.h"
@@ -654,6 +655,55 @@ void Filter::EncoderCallbacks::respond(Http::HeaderMapPtr&&, Buffer::Instance*, 
   // TODO(mattklein123): Support response in response path if nothing has been continued
   // yet.
   luaL_error(state, "respond not currently supported in the response path");
+}
+
+FilterConfigPerRoute::LuaThread::LuaThread(const std::string& code) : state_{lua_open()} {
+  luaL_openlibs(state_.get());
+  int rc = luaL_dostring(state_.get(), code.c_str());
+  ASSERT(rc == 0);
+}
+
+void FilterConfigPerRoute::registerTypes() {
+  Filters::Common::Lua::BufferWrapper::registerType(thread_->state_.get());
+  Filters::Common::Lua::MetadataMapWrapper::registerType(thread_->state_.get());
+  Filters::Common::Lua::MetadataMapIterator::registerType(thread_->state_.get());
+  Filters::Common::Lua::ConnectionWrapper::registerType(thread_->state_.get());
+  Filters::Common::Lua::SslConnectionWrapper::registerType(thread_->state_.get());
+  HeaderMapWrapper::registerType(thread_->state_.get());
+  HeaderMapIterator::registerType(thread_->state_.get());
+  StreamInfoWrapper::registerType(thread_->state_.get());
+  DynamicMetadataMapWrapper::registerType(thread_->state_.get());
+  DynamicMetadataMapIterator::registerType(thread_->state_.get());
+  StreamHandleWrapper::registerType(thread_->state_.get());
+  PublicKeyWrapper::registerType(thread_->state_.get());
+
+  request_function_slot_ = registerGlobal("envoy_on_request");
+  if (getGlobalRef(request_function_slot_) == LUA_REFNIL) {
+    ENVOY_LOG(info, "envoy_on_request() function not found. Lua filter will not hook requests.");
+  }
+
+  response_function_slot_ = registerGlobal("envoy_on_response");
+  if (getGlobalRef(response_function_slot_) == LUA_REFNIL) {
+    ENVOY_LOG(info, "envoy_on_response() function not found. Lua filter will not hook responses.");
+  }
+}
+
+Filters::Common::Lua::CoroutinePtr FilterConfigPerRoute::createCoroutine() const {
+  auto state = thread_->state_.get();
+  return std::make_unique<Filters::Common::Lua::Coroutine>(
+      std::make_pair(lua_newthread(state), state));
+}
+
+uint64_t FilterConfigPerRoute::registerGlobal(const std::string& global) {
+  lua_getglobal(thread_->state_.get(), global.c_str());
+  if (lua_isfunction(thread_->state_.get(), -1)) {
+    thread_->global_slots_.push_back(luaL_ref(thread_->state_.get(), LUA_REGISTRYINDEX));
+  } else {
+    ENVOY_LOG(debug, "definition for '{}' not found in script", global);
+    lua_pop(thread_->state_.get(), 1);
+    thread_->global_slots_.push_back(LUA_REFNIL);
+  }
+  return thread_->current_global_slot_++;
 }
 
 } // namespace Lua
