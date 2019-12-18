@@ -535,34 +535,34 @@ void Filter::onDestroy() {
 
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool end_stream) {
   const auto* config_per_route = getConfigPerRoute(decoder_callbacks_.callbacks_);
-  int function_ref = config_per_route == nullptr ? config_->requestFunctionRef()
-                                                 : config_per_route->requestFunctionRef();
-  if (function_ref == LUA_REFNIL) {
+  if (config_per_route != nullptr && config_per_route->disabled()) {
     return Http::FilterHeadersStatus::Continue;
   }
-
-  request_coroutine_ = config_per_route == nullptr ? config_->createCoroutine()
-                                                   : config_per_route->createCoroutine();
-  return doHeaders(request_stream_wrapper_, request_coroutine_, decoder_callbacks_, function_ref,
-                   headers, end_stream);
+  FilterConfigConstSharedPtr config =
+      config_per_route == nullptr ? config_ : config_per_route->filterConfig();
+  return doHeaders(request_stream_wrapper_, request_coroutine_, decoder_callbacks_,
+                   config->requestFunctionRef(), config, headers, end_stream);
 }
 Http::FilterHeadersStatus Filter::encodeHeaders(Http::HeaderMap& headers, bool end_stream) {
-  const auto* config_per_route = getConfigPerRoute(encoder_callbacks_.callbacks_);
-  int function_ref = config_per_route == nullptr ? config_->responseFunctionRef()
-                                                 : config_per_route->responseFunctionRef();
-  if (function_ref == LUA_REFNIL) {
+  const auto* config_per_route = getConfigPerRoute(decoder_callbacks_.callbacks_);
+  if (config_per_route != nullptr && config_per_route->disabled()) {
     return Http::FilterHeadersStatus::Continue;
   }
-
-  response_coroutine_ = config_per_route == nullptr ? config_->createCoroutine()
-                                                    : config_per_route->createCoroutine();
-  return doHeaders(response_stream_wrapper_, response_coroutine_, decoder_callbacks_, function_ref,
-                   headers, end_stream);
+  FilterConfigConstSharedPtr config =
+      config_per_route == nullptr ? config_ : config_per_route->filterConfig();
+  return doHeaders(response_stream_wrapper_, response_coroutine_, encoder_callbacks_,
+                   config->responseFunctionRef(), config, headers, end_stream);
 }
 Http::FilterHeadersStatus Filter::doHeaders(StreamHandleRef& handle,
                                             Filters::Common::Lua::CoroutinePtr& coroutine,
                                             FilterCallbacks& callbacks, int function_ref,
+                                            FilterConfigConstSharedPtr& config,
                                             Http::HeaderMap& headers, bool end_stream) {
+  if (function_ref == LUA_REFNIL) {
+    return Http::FilterHeadersStatus::Continue;
+  }
+
+  coroutine = config->createCoroutine();
   handle.reset(StreamHandleWrapper::create(coroutine->luaState(), *coroutine, headers, end_stream,
                                            *this, callbacks),
                true);

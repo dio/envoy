@@ -324,19 +324,15 @@ public:
                            ? nullptr
                            : new FilterConfig{proto_config.inline_code(), tls, cluster_manager}} {}
 
-  Filters::Common::Lua::CoroutinePtr createCoroutine() const {
-    return filter_config_->createCoroutine();
-  }
-  int requestFunctionRef() const { return filter_config_->requestFunctionRef(); }
-  int responseFunctionRef() const { return filter_config_->responseFunctionRef(); }
-  uint64_t runtimeBytesUsed() const { return filter_config_->runtimeBytesUsed(); }
-  void runtimeGC() const { return filter_config_->runtimeGC(); }
-
   bool disabled() const { return disabled_; }
+  FilterConfigConstSharedPtr filterConfig() const {
+    ASSERT(!disabled_);
+    return filter_config_;
+  }
 
 private:
   bool disabled_;
-  std::unique_ptr<FilterConfig> filter_config_;
+  FilterConfigConstSharedPtr filter_config_;
 };
 
 // TODO(mattklein123): Filter stats.
@@ -431,7 +427,8 @@ private:
   Http::FilterHeadersStatus doHeaders(StreamHandleRef& handle,
                                       Filters::Common::Lua::CoroutinePtr& coroutine,
                                       FilterCallbacks& callbacks, int function_ref,
-                                      Http::HeaderMap& headers, bool end_stream);
+                                      FilterConfigConstSharedPtr& config, Http::HeaderMap& headers,
+                                      bool end_stream);
   Http::FilterDataStatus doData(StreamHandleRef& handle, Buffer::Instance& data, bool end_stream);
   Http::FilterTrailersStatus doTrailers(StreamHandleRef& handle, Http::HeaderMap& trailers);
 
