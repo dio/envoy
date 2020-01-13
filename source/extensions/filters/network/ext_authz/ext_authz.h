@@ -50,18 +50,24 @@ public:
          Stats::Scope& scope)
       : stats_(generateStats(config.stat_prefix(), scope)),
         failure_mode_allow_(config.failure_mode_allow()),
-        include_peer_certificate_(config.include_peer_certificate()) {}
+        include_peer_certificate_(config.include_peer_certificate()),
+        metadata_context_namespaces_(config.metadata_context_namespaces().begin(),
+                                     config.metadata_context_namespaces().end()) {}
 
   const InstanceStats& stats() { return stats_; }
   bool failureModeAllow() const { return failure_mode_allow_; }
   void setFailModeAllow(bool value) { failure_mode_allow_ = value; }
   bool includePeerCertificate() const { return include_peer_certificate_; }
+  const std::vector<std::string>& metadataContextNamespaces() {
+    return metadata_context_namespaces_;
+  }
 
 private:
   static InstanceStats generateStats(const std::string& name, Stats::Scope& scope);
   const InstanceStats stats_;
   bool failure_mode_allow_;
   const bool include_peer_certificate_;
+  const std::vector<std::string> metadata_context_namespaces_;
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;

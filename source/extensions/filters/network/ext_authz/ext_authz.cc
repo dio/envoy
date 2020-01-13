@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <string>
 
+#include "envoy/config/core/v3alpha/base.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/assert.h"
@@ -20,8 +21,20 @@ InstanceStats Config::generateStats(const std::string& name, Stats::Scope& scope
 }
 
 void Filter::callCheck() {
-  Filters::Common::ExtAuthz::CheckRequestUtils::createTcpCheck(filter_callbacks_, check_request_,
-                                                               config_->includePeerCertificate());
+  // If metadata_context_namespaces is specified, pass matching metadata to the ext_authz service
+  envoy::config::core::v3alpha::Metadata metadata_context;
+  const auto& request_metadata =
+      filter_callbacks_->connection().streamInfo().dynamicMetadata().filter_metadata();
+  for (const auto& context_key : config_->metadataContextNamespaces()) {
+    const auto& metadata_it = request_metadata.find(context_key);
+    if (metadata_it != request_metadata.end()) {
+      (*metadata_context.mutable_filter_metadata())[metadata_it->first] = metadata_it->second;
+    }
+  }
+
+  Filters::Common::ExtAuthz::CheckRequestUtils::createTcpCheck(
+      filter_callbacks_, std::move(metadata_context), check_request_,
+      config_->includePeerCertificate());
 
   status_ = Status::Calling;
   config_->stats().active_.inc();
@@ -33,7 +46,7 @@ void Filter::callCheck() {
 }
 
 Network::FilterStatus Filter::onData(Buffer::Instance&, bool /* end_stream */) {
-  if (status_ == Status::NotStarted) {
+  if (status_ != Status::Calling) {
     // By waiting to invoke the check at onData() the call to authorization service will have
     // sufficient information to fill out the checkRequest_.
     callCheck();

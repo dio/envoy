@@ -182,6 +182,7 @@ void CheckRequestUtils::createHttpCheck(
 }
 
 void CheckRequestUtils::createTcpCheck(const Network::ReadFilterCallbacks* callbacks,
+                                       envoy::config::core::v3alpha::Metadata&& metadata_context,
                                        envoy::service::auth::v3alpha::CheckRequest& request,
                                        bool include_peer_certificate) {
 
@@ -192,6 +193,7 @@ void CheckRequestUtils::createTcpCheck(const Network::ReadFilterCallbacks* callb
                      include_peer_certificate);
   setAttrContextPeer(*attrs->mutable_destination(), cb->connection(), "", true,
                      include_peer_certificate);
+  (*attrs->mutable_metadata_context()) = std::move(metadata_context);
 }
 
 } // namespace ExtAuthz
