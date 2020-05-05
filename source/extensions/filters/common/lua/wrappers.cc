@@ -217,6 +217,11 @@ int MetadataMapWrapper::luaPairs(lua_State* state) {
   return 1;
 }
 
+int SslConnectionWrapper::luaTlsVersion(lua_State* state) {
+  lua_pushstring(state, connection_info_ == nullptr ? "" : connection_info_->tlsVersion().c_str());
+  return 1;
+}
+
 int ConnectionWrapper::luaSsl(lua_State* state) {
   const auto& ssl = connection_->ssl();
   if (ssl != nullptr) {

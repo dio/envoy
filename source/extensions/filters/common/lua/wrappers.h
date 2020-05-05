@@ -112,10 +112,19 @@ private:
  */
 class SslConnectionWrapper : public BaseLuaObject<SslConnectionWrapper> {
 public:
-  SslConnectionWrapper(const Ssl::ConnectionInfoConstSharedPtr) {}
-  static ExportedFunctions exportedFunctions() { return {}; }
+  SslConnectionWrapper(const Ssl::ConnectionInfoConstSharedPtr info) : connection_info_{info} {}
+  static ExportedFunctions exportedFunctions() { return {{"tlsVersion", static_luaTlsVersion}}; }
+
+private:
+  /**
+   * Return the TLS version (e.g., TLSv1.2, TLSv1.3) used in the established TLS connection.
+   * @return string if secured and nil if not.
+   */
+  DECLARE_LUA_FUNCTION(SslConnectionWrapper, luaTlsVersion);
 
   // TODO(dio): Add more Lua APIs around Ssl::Connection.
+
+  const Ssl::ConnectionInfoConstSharedPtr connection_info_;
 };
 
 /**
@@ -124,6 +133,8 @@ public:
 class ConnectionWrapper : public BaseLuaObject<ConnectionWrapper> {
 public:
   ConnectionWrapper(const Network::Connection* connection) : connection_{connection} {}
+  // TODO(dio): Remove this in favor of StreamInfo::downstreamSslConnection wrapper since ssl() in
+  // envoy/network/connection.h is subject to removal.
   static ExportedFunctions exportedFunctions() { return {{"ssl", static_luaSsl}}; }
 
 private:
