@@ -1,4 +1,4 @@
-FROM envoyproxy/envoy-dev:latest
+FROM dio123/envoy-lua:11404
 
 RUN apt-get update && apt-get -q install -y \
     curl
