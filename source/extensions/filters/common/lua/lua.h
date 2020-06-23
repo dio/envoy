@@ -405,11 +405,18 @@ public:
    */
   void runtimeGC() { lua_gc(tls_slot_->getTyped<LuaThreadLocal>().state_.get(), LUA_GCCOLLECT, 0); }
 
+  /**
+   * Update current code.
+   */
+  int updateCode(const std::string& code, const std::vector<std::string>& names,
+                 const std::string& signature, const std::string& function_name);
+
 private:
   struct LuaThreadLocal : public ThreadLocal::ThreadLocalObject {
     LuaThreadLocal(const std::string& code);
 
     CSmartPtr<lua_State, lua_close> state_;
+    absl::flat_hash_map<const std::string, int> function_refs_;
     std::vector<int> global_slots_;
   };
 

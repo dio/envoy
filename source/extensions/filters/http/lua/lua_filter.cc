@@ -2,13 +2,17 @@
 
 #include <atomic>
 #include <memory>
+#include <vector>
 
+#include "common/common/empty_string.h"
+#include "common/http/headers.h"
 #include "envoy/http/codes.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
 #include "common/common/enum_to_int.h"
 #include "common/crypto/utility.h"
+#include "common/http/utility.h"
 #include "common/http/message_impl.h"
 
 namespace Envoy {
@@ -138,6 +142,17 @@ Http::AsyncClient::Request* makeHttpCall(lua_State* state, Filter& filter,
   return filter.clusterManager().httpAsyncClientForCluster(cluster).send(
       std::move(message), callbacks, Http::AsyncClient::RequestOptions().setTimeout(timeout));
 }
+
+const FilterConfigPerRoute* getConfigPerRoute(Http::StreamFilterCallbacks* callbacks) {
+  if (callbacks == nullptr || callbacks->route() == nullptr ||
+      callbacks->route()->routeEntry() == nullptr) {
+    return nullptr;
+  }
+
+  return Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(
+      Extensions::HttpFilters::HttpFilterNames::get().Lua, callbacks->route());
+}
+
 } // namespace
 
 StreamHandleWrapper::StreamHandleWrapper(Filters::Common::Lua::Coroutine& coroutine,
@@ -583,14 +598,18 @@ FilterConfig::FilterConfig(const std::string& lua_code, ThreadLocal::SlotAllocat
   lua_state_.registerType<StreamHandleWrapper>();
   lua_state_.registerType<PublicKeyWrapper>();
 
-  request_function_slot_ = lua_state_.registerGlobal("envoy_on_request");
+  request_function_name_ = "envoy_on_request";
+  request_function_slot_ = lua_state_.registerGlobal(request_function_name_);
   if (lua_state_.getGlobalRef(request_function_slot_) == LUA_REFNIL) {
-    ENVOY_LOG(info, "envoy_on_request() function not found. Lua filter will not hook requests.");
+    ENVOY_LOG(info, "{}() function not found. Lua filter will not hook requests.",
+              request_function_name_);
   }
 
-  response_function_slot_ = lua_state_.registerGlobal("envoy_on_response");
+  response_function_name_ = "envoy_on_response";
+  response_function_slot_ = lua_state_.registerGlobal(response_function_name_);
   if (lua_state_.getGlobalRef(response_function_slot_) == LUA_REFNIL) {
-    ENVOY_LOG(info, "envoy_on_response() function not found. Lua filter will not hook responses.");
+    ENVOY_LOG(info, "{}() function not found. Lua filter will not hook responses.",
+              response_function_name_);
   }
 }
 
@@ -606,20 +625,43 @@ void Filter::onDestroy() {
 
 Http::FilterHeadersStatus Filter::doHeaders(StreamHandleRef& handle,
                                             Filters::Common::Lua::CoroutinePtr& coroutine,
-                                            FilterCallbacks& callbacks, int function_ref,
+                                            FilterCallbacks& callbacks,
+                                            Http::StreamFilterCallbacks* stream_callbacks,
+                                            int function_ref, const std::string& function_name,
                                             Http::HeaderMap& headers, bool end_stream) {
-  if (function_ref == LUA_REFNIL) {
-    return Http::FilterHeadersStatus::Continue;
+  Http::FilterHeadersStatus status = Http::FilterHeadersStatus::Continue;
+
+  int current_function_ref = function_ref;
+  if (current_function_ref == LUA_REFNIL) {
+    return status;
+  }
+
+  const auto* host = headers.get(Http::Headers::get().Host);
+  const auto* path = headers.get(Http::Headers::get().Path);
+
+  if (host != nullptr && path != nullptr) {
+    code_key_ = absl::StrCat(host->value().getStringView(), path->value().getStringView());
+  }
+
+  const auto* config_per_route = getConfigPerRoute(stream_callbacks);
+  if (config_per_route != nullptr) {
+    ASSERT(!code_key_.empty());
+    try {
+      const auto signature = absl::StrCat(code_key_, HashUtil::xxHash64(config_per_route->code()));
+      current_function_ref = config_->updateCode(config_per_route->code(), global_handler_names_,
+                                                 signature, function_name);
+    } catch (const Filters::Common::Lua::LuaException& e) {
+      scriptError(e);
+      return status;
+    }
   }
 
   coroutine = config_->createCoroutine();
   handle.reset(StreamHandleWrapper::create(coroutine->luaState(), *coroutine, headers, end_stream,
                                            *this, callbacks),
                true);
-
-  Http::FilterHeadersStatus status = Http::FilterHeadersStatus::Continue;
   try {
-    status = handle.get()->start(function_ref);
+    status = handle.get()->start(current_function_ref);
     handle.markDead();
   } catch (const Filters::Common::Lua::LuaException& e) {
     scriptError(e);

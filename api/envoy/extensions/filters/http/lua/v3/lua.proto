@@ -25,3 +25,13 @@ message Lua {
   // strings so complex scripts can be easily expressed inline in the configuration.
   string inline_code = 1 [(validate.rules).string = {min_bytes: 1}];
 }
+
+message LuaPerRoute {
+  oneof override {
+    option (validate.required) = true;
+
+    bool disabled = 1 [(validate.rules).bool = {const: true}];
+
+    string inline_code = 2 [(validate.rules).string = {min_bytes: 1}];
+  }
+}

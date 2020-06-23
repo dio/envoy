@@ -1,5 +1,6 @@
 #include "extensions/filters/common/lua/lua.h"
 
+#include <lua.h>
 #include <memory>
 
 #include "envoy/common/exception.h"
@@ -20,6 +21,12 @@ void Coroutine::start(int function_ref, int num_args, const std::function<void()
 
   state_ = State::Yielded;
   lua_rawgeti(coroutine_state_.get(), LUA_REGISTRYINDEX, function_ref);
+  /*if (name.empty()) {
+    lua_rawgeti(coroutine_state_.get(), LUA_REGISTRYINDEX, function_ref);
+  } else {
+    lua_rawgeti(coroutine_state_.get(), LUA_REGISTRYINDEX, function_ref);
+  }*/
+
   ASSERT(lua_isfunction(coroutine_state_.get(), -1));
 
   // The function needs to come before the arguments but the arguments are already on the stack,
@@ -75,7 +82,9 @@ uint64_t ThreadLocalState::registerGlobal(const std::string& global) {
     LuaThreadLocal& tls = tls_slot_->getTyped<LuaThreadLocal>();
     lua_getglobal(tls.state_.get(), global.c_str());
     if (lua_isfunction(tls.state_.get(), -1)) {
-      tls.global_slots_.push_back(luaL_ref(tls.state_.get(), LUA_REGISTRYINDEX));
+      int ref = luaL_ref(tls.state_.get(), LUA_REGISTRYINDEX);
+      tls.global_slots_.push_back(ref);
+      tls.function_refs_.insert_or_assign(global, ref);
     } else {
       ENVOY_LOG(debug, "definition for '{}' not found in script", global);
       lua_pop(tls.state_.get(), 1);
@@ -96,6 +105,38 @@ ThreadLocalState::LuaThreadLocal::LuaThreadLocal(const std::string& code) : stat
   luaL_openlibs(state_.get());
   int rc = luaL_dostring(state_.get(), code.c_str());
   ASSERT(rc == 0);
+}
+
+int ThreadLocalState::updateCode(const std::string& code, const std::vector<std::string>& names,
+                                 const std::string& signature, const std::string& function_name) {
+  auto& slot = tls_slot_->getTyped<LuaThreadLocal>();
+  auto* state = slot.state_.get();
+
+  auto key = absl::StrCat(function_name, signature);
+  auto it = slot.function_refs_.find(key);
+
+  if (it == slot.function_refs_.end()) {
+
+    if (0 != luaL_dostring(state, code.c_str())) {
+      throw LuaException(fmt::format("script load error: {}", lua_tostring(state, -1)));
+    }
+
+    int current_ref = 0;
+    for (const auto& name : names) {
+      lua_getglobal(state, name.c_str());
+      lua_isfunction(state, -1);
+      int ref = luaL_ref(state, LUA_REGISTRYINDEX);
+      slot.function_refs_.insert_or_assign(key, ref);
+      if (name == function_name) {
+        current_ref = ref;
+      }
+    }
+
+    ASSERT(current_ref > 0);
+    return current_ref;
+  }
+
+  return it->second;
 }
 
 } // namespace Lua

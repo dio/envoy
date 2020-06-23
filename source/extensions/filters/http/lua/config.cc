@@ -21,6 +21,13 @@ Http::FilterFactoryCb LuaFilterConfig::createFilterFactoryFromProtoTyped(
   };
 }
 
+Router::RouteSpecificFilterConfigConstSharedPtr
+LuaFilterConfig::createRouteSpecificFilterConfigTyped(
+    const envoy::extensions::filters::http::lua::v3::LuaPerRoute& proto_config,
+    Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) {
+  return std::make_shared<FilterConfigPerRoute>(proto_config);
+}
+
 /**
  * Static registration for the Lua filter. @see RegisterFactory.
  */

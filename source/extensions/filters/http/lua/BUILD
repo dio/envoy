@@ -29,6 +29,7 @@ envoy_cc_library(
         "//source/extensions/filters/common/lua:lua_lib",
         "//source/extensions/filters/common/lua:wrappers_lib",
         "//source/extensions/filters/http:well_known_names",
+        "@envoy_api//envoy/extensions/filters/http/lua/v3:pkg_cc_proto",
     ],
 )
 

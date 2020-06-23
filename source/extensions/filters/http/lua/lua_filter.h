@@ -1,7 +1,9 @@
 #pragma once
 
+#include "common/common/empty_string.h"
 #include "envoy/http/filter.h"
 #include "envoy/upstream/cluster_manager.h"
+#include "envoy/extensions/filters/http/lua/v3/lua.pb.h"
 
 #include "common/crypto/utility.h"
 
@@ -299,6 +301,12 @@ public:
   int responseFunctionRef() { return lua_state_.getGlobalRef(response_function_slot_); }
   uint64_t runtimeBytesUsed() { return lua_state_.runtimeBytesUsed(); }
   void runtimeGC() { return lua_state_.runtimeGC(); }
+  int updateCode(const std::string& code, const std::vector<std::string> names,
+                 const std::string& signature, const std::string& function_name) {
+    return lua_state_.updateCode(code, names, signature, function_name);
+  }
+  const std::string& requestFunctionName() const { return request_function_name_; }
+  const std::string& responseFunctionName() const { return response_function_name_; }
 
   Upstream::ClusterManager& cluster_manager_;
 
@@ -306,9 +314,25 @@ private:
   Filters::Common::Lua::ThreadLocalState lua_state_;
   uint64_t request_function_slot_;
   uint64_t response_function_slot_;
+  std::string request_function_name_;
+  std::string response_function_name_;
 };
 
 using FilterConfigConstSharedPtr = std::shared_ptr<FilterConfig>;
+
+/**
+ * Per route configuration for the filter.
+ */
+class FilterConfigPerRoute : public Router::RouteSpecificFilterConfig {
+public:
+  FilterConfigPerRoute(const envoy::extensions::filters::http::lua::v3::LuaPerRoute& proto_config)
+      : inline_code_(proto_config.inline_code()) {}
+
+  const std::string& code() const { return inline_code_; }
+
+private:
+  const std::string inline_code_;
+};
 
 // TODO(mattklein123): Filter stats.
 
@@ -330,7 +354,8 @@ public:
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
                                           bool end_stream) override {
     return doHeaders(request_stream_wrapper_, request_coroutine_, decoder_callbacks_,
-                     config_->requestFunctionRef(), headers, end_stream);
+                     decoder_callbacks_.callbacks_, config_->requestFunctionRef(),
+                     config_->requestFunctionName(), headers, end_stream);
   }
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override {
     return doData(request_stream_wrapper_, data, end_stream);
@@ -349,7 +374,8 @@ public:
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
                                           bool end_stream) override {
     return doHeaders(response_stream_wrapper_, response_coroutine_, encoder_callbacks_,
-                     config_->responseFunctionRef(), headers, end_stream);
+                     encoder_callbacks_.callbacks_, config_->responseFunctionRef(),
+                     config_->responseFunctionName(), headers, end_stream);
   }
   Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override {
     return doData(response_stream_wrapper_, data, end_stream);
@@ -411,7 +437,9 @@ private:
 
   Http::FilterHeadersStatus doHeaders(StreamHandleRef& handle,
                                       Filters::Common::Lua::CoroutinePtr& coroutine,
-                                      FilterCallbacks& callbacks, int function_ref,
+                                      FilterCallbacks& callbacks,
+                                      Http::StreamFilterCallbacks* stream_callbacks,
+                                      int function_ref, const std::string& function_name,
                                       Http::HeaderMap& headers, bool end_stream);
   Http::FilterDataStatus doData(StreamHandleRef& handle, Buffer::Instance& data, bool end_stream);
   Http::FilterTrailersStatus doTrailers(StreamHandleRef& handle, Http::HeaderMap& trailers);
@@ -422,6 +450,8 @@ private:
   StreamHandleRef request_stream_wrapper_;
   StreamHandleRef response_stream_wrapper_;
   bool destroyed_{};
+  const std::vector<std::string> global_handler_names_{"envoy_on_request", "envoy_on_response"};
+  std::string code_key_{EMPTY_STRING};
 
   // These coroutines used to be owned by the stream handles. After investigating #3570, it
   // became clear that there is a circular memory reference when a coroutine yields. Basically,
