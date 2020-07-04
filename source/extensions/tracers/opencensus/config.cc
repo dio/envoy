@@ -28,9 +28,10 @@ Tracing::HttpTracerSharedPtr OpenCensusTracerFactory::createHttpTracerTyped(
       throw EnvoyException("Opencensus has already been configured with a different config.");
     }
   }
-  Tracing::DriverPtr driver =
-      std::make_unique<Driver>(proto_config, context.serverFactoryContext().localInfo(),
-                               context.serverFactoryContext().api());
+  Tracing::DriverPtr driver = std::make_unique<Driver>(
+      proto_config, context.serverFactoryContext().localInfo(),
+      context.serverFactoryContext().api(), context.serverFactoryContext().clusterManager(),
+      context.serverFactoryContext().dispatcher());
   tracer_ = std::make_shared<Tracing::HttpTracerImpl>(std::move(driver),
                                                       context.serverFactoryContext().localInfo());
   config_ = proto_config;

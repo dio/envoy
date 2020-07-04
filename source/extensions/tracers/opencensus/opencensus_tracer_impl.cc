@@ -1,4 +1,6 @@
 #include "extensions/tracers/opencensus/opencensus_tracer_impl.h"
+#include "envoy/event/dispatcher.h"
+#include "extensions/tracers/opencensus/exporters/zipkin_exporter.h"
 
 #include <grpcpp/grpcpp.h>
 
@@ -13,6 +15,7 @@
 #include "opencensus/exporters/trace/stackdriver/stackdriver_exporter.h"
 #include "opencensus/exporters/trace/stdout/stdout_exporter.h"
 #include "opencensus/exporters/trace/zipkin/zipkin_exporter.h"
+#include "opencensus/trace/exporter/span_exporter.h"
 #include "opencensus/trace/propagation/b3.h"
 #include "opencensus/trace/propagation/cloud_trace_context.h"
 #include "opencensus/trace/propagation/grpc_trace_bin.h"
@@ -244,7 +247,8 @@ void Span::setSampled(bool sampled) { span_.AddAnnotation("setSampled", {{"sampl
 } // namespace
 
 Driver::Driver(const envoy::config::trace::v3::OpenCensusConfig& oc_config,
-               const LocalInfo::LocalInfo& localinfo, Api::Api& api)
+               const LocalInfo::LocalInfo& localinfo, Api::Api& api,
+               Upstream::ClusterManager& cluster_manager, Event::Dispatcher& dispatcher)
     : oc_config_(oc_config), local_info_(localinfo) {
   // To give user a chance to correct initially invalid configuration and try to apply it once again
   // without a need to restart Envoy, validation checks must be done prior to any side effects.
@@ -292,7 +296,8 @@ Driver::Driver(const envoy::config::trace::v3::OpenCensusConfig& oc_config,
   if (oc_config.zipkin_exporter_enabled()) {
     ::opencensus::exporters::trace::ZipkinExporterOptions opts(oc_config.zipkin_url());
     opts.service_name = local_info_.clusterName();
-    ::opencensus::exporters::trace::ZipkinExporter::Register(opts);
+    ::opencensus::trace::exporter::SpanExporter::RegisterHandler(
+        std::make_unique<Exporters::ZipkinSpanExporterHandler>(dispatcher, cluster_manager));
   }
   if (oc_config.ocagent_exporter_enabled()) {
     ::opencensus::exporters::trace::OcAgentOptions opts;

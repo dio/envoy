@@ -43,7 +43,9 @@ envoy_cc_library(
     ],
     deps = [
         "//source/common/config:utility_lib",
+        "//source/extensions/tracers/opencensus/exporters:zipkin_exporter_lib",
         "//source/common/tracing:http_tracer_lib",
         "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
+        "//include/envoy/upstream:cluster_manager_interface",
     ] + envoy_select_google_grpc(["//source/common/grpc:google_async_client_lib"]),
 )
