@@ -5,7 +5,7 @@
 #include "common/common/utility.h"
 
 #include "extensions/tracers/zipkin/span_context.h"
-#include "extensions/tracers/zipkin/util.h"
+#include "extensions/tracers/zipkin/utility.h"
 #include "extensions/tracers/zipkin/zipkin_core_constants.h"
 #include "extensions/tracers/zipkin/zipkin_json_field_names.h"
 
@@ -25,7 +25,7 @@ Endpoint& Endpoint::operator=(const Endpoint& ep) {
   return *this;
 }
 
-const ProtobufWkt::Struct Endpoint::toStruct(Util::Replacements&) const {
+const ProtobufWkt::Struct Endpoint::toStruct(Utility::Replacements&) const {
   ProtobufWkt::Struct endpoint;
   auto* fields = endpoint.mutable_fields();
   if (!address_) {
@@ -66,10 +66,10 @@ void Annotation::changeEndpointServiceName(const std::string& service_name) {
   }
 }
 
-const ProtobufWkt::Struct Annotation::toStruct(Util::Replacements& replacements) const {
+const ProtobufWkt::Struct Annotation::toStruct(Utility::Replacements& replacements) const {
   ProtobufWkt::Struct annotation;
   auto* fields = annotation.mutable_fields();
-  (*fields)[ANNOTATION_TIMESTAMP] = Util::uint64Value(timestamp_, SPAN_TIMESTAMP, replacements);
+  (*fields)[ANNOTATION_TIMESTAMP] = Utility::uint64Value(timestamp_, SPAN_TIMESTAMP, replacements);
   (*fields)[ANNOTATION_VALUE] = ValueUtil::stringValue(value_);
   if (endpoint_.has_value()) {
     (*fields)[ANNOTATION_ENDPOINT] =
@@ -98,7 +98,7 @@ BinaryAnnotation& BinaryAnnotation::operator=(const BinaryAnnotation& ann) {
   return *this;
 }
 
-const ProtobufWkt::Struct BinaryAnnotation::toStruct(Util::Replacements& replacements) const {
+const ProtobufWkt::Struct BinaryAnnotation::toStruct(Utility::Replacements& replacements) const {
   ProtobufWkt::Struct binary_annotation;
   auto* fields = binary_annotation.mutable_fields();
   (*fields)[BINARY_ANNOTATION_KEY] = ValueUtil::stringValue(key_);
@@ -144,7 +144,7 @@ void Span::setServiceName(const std::string& service_name) {
   }
 }
 
-const ProtobufWkt::Struct Span::toStruct(Util::Replacements& replacements) const {
+const ProtobufWkt::Struct Span::toStruct(Utility::Replacements& replacements) const {
   ProtobufWkt::Struct span;
   auto* fields = span.mutable_fields();
   (*fields)[SPAN_TRACE_ID] = ValueUtil::stringValue(traceIdAsHexString());
@@ -159,13 +159,14 @@ const ProtobufWkt::Struct Span::toStruct(Util::Replacements& replacements) const
     // Usually we store number to a ProtobufWkt::Struct object via ValueUtil::numberValue.
     // However, due to the possibility of rendering that to a number with scientific notation, we
     // chose to store it as a string and keeping track the corresponding replacement.
-    (*fields)[SPAN_TIMESTAMP] = Util::uint64Value(timestamp_.value(), SPAN_TIMESTAMP, replacements);
+    (*fields)[SPAN_TIMESTAMP] =
+        Utility::uint64Value(timestamp_.value(), SPAN_TIMESTAMP, replacements);
   }
 
   if (duration_.has_value()) {
-    // Since SPAN_DURATION has the same data type with SPAN_TIMESTAMP, we use Util::uint64Value to
-    // store it.
-    (*fields)[SPAN_DURATION] = Util::uint64Value(duration_.value(), SPAN_DURATION, replacements);
+    // Since SPAN_DURATION has the same data type with SPAN_TIMESTAMP, we use Utility::uint64Value
+    // to store it.
+    (*fields)[SPAN_DURATION] = Utility::uint64Value(duration_.value(), SPAN_DURATION, replacements);
   }
 
   if (!annotations_.empty()) {

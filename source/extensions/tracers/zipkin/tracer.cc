@@ -5,7 +5,7 @@
 #include "common/common/utility.h"
 #include "common/tracing/http_tracer_impl.h"
 
-#include "extensions/tracers/zipkin/util.h"
+#include "extensions/tracers/zipkin/utility.h"
 #include "extensions/tracers/zipkin/zipkin_core_constants.h"
 
 namespace Envoy {

@@ -4,7 +4,7 @@
 
 #include "common/protobuf/utility.h"
 
-#include "extensions/tracers/zipkin/util.h"
+#include "extensions/tracers/zipkin/utility.h"
 #include "extensions/tracers/zipkin/zipkin_core_constants.h"
 #include "extensions/tracers/zipkin/zipkin_json_field_names.h"
 
@@ -72,7 +72,7 @@ JsonV2Serializer::JsonV2Serializer(const bool shared_span_context)
     : shared_span_context_{shared_span_context} {}
 
 std::string JsonV2Serializer::serialize(const std::vector<Span>& zipkin_spans) {
-  Util::Replacements replacements;
+  Utility::Replacements replacements;
   const std::string serialized_elements = absl::StrJoin(
       zipkin_spans, ",", [this, &replacements](std::string* out, const Span& zipkin_span) {
         const auto& replacement_values = replacements;
@@ -111,7 +111,8 @@ std::string JsonV2Serializer::serialize(const std::vector<Span>& zipkin_spans) {
 }
 
 const std::vector<ProtobufWkt::Struct>
-JsonV2Serializer::toListOfSpans(const Span& zipkin_span, Util::Replacements& replacements) const {
+JsonV2Serializer::toListOfSpans(const Span& zipkin_span,
+                                Utility::Replacements& replacements) const {
   std::vector<ProtobufWkt::Struct> spans;
   spans.reserve(zipkin_span.annotations().size());
   for (const auto& annotation : zipkin_span.annotations()) {
@@ -138,7 +139,7 @@ JsonV2Serializer::toListOfSpans(const Span& zipkin_span, Util::Replacements& rep
       // serialized: "1584324295476870"), and replace it post MessageToJsonString serialization with
       // integer (1584324295476870 without `"`), see: JsonV2Serializer::serialize.
       (*fields)[SPAN_TIMESTAMP] =
-          Util::uint64Value(annotation.timestamp(), SPAN_TIMESTAMP, replacements);
+          Utility::uint64Value(annotation.timestamp(), SPAN_TIMESTAMP, replacements);
       (*fields)[SPAN_LOCAL_ENDPOINT] =
           ValueUtil::structValue(toProtoEndpoint(annotation.endpoint()));
     }
@@ -156,10 +157,10 @@ JsonV2Serializer::toListOfSpans(const Span& zipkin_span, Util::Replacements& rep
     }
 
     if (zipkin_span.isSetDuration()) {
-      // Since SPAN_DURATION has the same data type with SPAN_TIMESTAMP, we use Util::uint64Value to
-      // store it.
+      // Since SPAN_DURATION has the same data type with SPAN_TIMESTAMP, we use Utility::uint64Value
+      // to store it.
       (*fields)[SPAN_DURATION] =
-          Util::uint64Value(zipkin_span.duration(), SPAN_DURATION, replacements);
+          Utility::uint64Value(zipkin_span.duration(), SPAN_DURATION, replacements);
     }
 
     const auto& binary_annotations = zipkin_span.binaryAnnotations();
@@ -259,9 +260,9 @@ ProtobufSerializer::toProtoEndpoint(const Endpoint& zipkin_endpoint) const {
   Network::Address::InstanceConstSharedPtr address = zipkin_endpoint.address();
   if (address) {
     if (address->ip()->version() == Network::Address::IpVersion::v4) {
-      endpoint.set_ipv4(Util::toByteString(address->ip()->ipv4()->address()));
+      endpoint.set_ipv4(Utility::toByteString(address->ip()->ipv4()->address()));
     } else {
-      endpoint.set_ipv6(Util::toByteString(address->ip()->ipv6()->address()));
+      endpoint.set_ipv6(Utility::toByteString(address->ip()->ipv6()->address()));
     }
     endpoint.set_port(address->ip()->port());
   }

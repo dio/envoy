@@ -19,10 +19,11 @@ envoy_cc_library(
         "opencensus_trace",
     ],
     deps = [
-        "//source/common/http:message_lib",
+        "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/common:thread_lib",
+        "//source/common/http:message_lib",
         "//source/common/http:utility_lib",
         "//source/common/protobuf:utility_lib",
-        "//include/envoy/upstream:cluster_manager_interface",
+        "//source/extensions/tracers/zipkin:utility_lib",
     ],
 )

@@ -18,7 +18,6 @@ envoy_cc_library(
         "span_context.cc",
         "span_context_extractor.cc",
         "tracer.cc",
-        "util.cc",
         "zipkin_core_types.cc",
         "zipkin_tracer_impl.cc",
     ],
@@ -28,7 +27,6 @@ envoy_cc_library(
         "span_context_extractor.h",
         "tracer.h",
         "tracer_interface.h",
-        "util.h",
         "zipkin_core_constants.h",
         "zipkin_core_types.h",
         "zipkin_json_field_names.h",
@@ -38,6 +36,7 @@ envoy_cc_library(
         "abseil_optional",
     ],
     deps = [
+        ":utility_lib",
         "//include/envoy/common:time_interface",
         "//include/envoy/local_info:local_info_interface",
         "//include/envoy/network:address_interface",
@@ -61,6 +60,18 @@ envoy_cc_library(
         "//source/extensions/tracers:well_known_names",
         "@com_github_openzipkin_zipkinapi//:zipkin_cc_proto",
         "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "utility_lib",
+    srcs = ["utility.cc"],
+    hdrs = ["utility.h"],
+    deps = [
+        "//include/envoy/common:time_interface",
+        "//source/common/common:byte_order_lib",
+        "//source/common/common:hex_lib",
+        "//source/common/protobuf:utility_lib",
     ],
 )
 

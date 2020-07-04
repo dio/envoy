@@ -1,4 +1,4 @@
-#include "extensions/tracers/zipkin/util.h"
+#include "extensions/tracers/zipkin/utility.h"
 
 #include <chrono>
 #include <random>
@@ -15,7 +15,7 @@ namespace Extensions {
 namespace Tracers {
 namespace Zipkin {
 
-uint64_t Util::generateRandom64(TimeSource& time_source) {
+uint64_t Utility::generateRandom64(TimeSource& time_source) {
   uint64_t seed = std::chrono::duration_cast<std::chrono::nanoseconds>(
                       time_source.systemTime().time_since_epoch())
                       .count();
@@ -23,8 +23,8 @@ uint64_t Util::generateRandom64(TimeSource& time_source) {
   return rand_64();
 }
 
-ProtobufWkt::Value Util::uint64Value(uint64_t value, absl::string_view name,
-                                     Replacements& replacements) {
+ProtobufWkt::Value Utility::uint64Value(uint64_t value, absl::string_view name,
+                                        Replacements& replacements) {
   const std::string string_value = std::to_string(value);
   replacements.push_back({absl::StrCat("\"", name, "\":\"", string_value, "\""),
                           absl::StrCat("\"", name, "\":", string_value)});

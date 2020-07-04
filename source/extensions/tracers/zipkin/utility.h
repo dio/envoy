@@ -16,7 +16,7 @@ namespace Zipkin {
 /**
  * Utility class with a few convenient methods
  */
-class Util {
+class Utility {
 public:
   /**
    * Returns a randomly-generated 64-bit integer number.

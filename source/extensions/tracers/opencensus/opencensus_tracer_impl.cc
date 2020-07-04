@@ -1,13 +1,14 @@
 #include "extensions/tracers/opencensus/opencensus_tracer_impl.h"
-#include "envoy/event/dispatcher.h"
-#include "extensions/tracers/opencensus/exporters/zipkin_exporter.h"
 
 #include <grpcpp/grpcpp.h>
 
 #include "envoy/config/trace/v3/opencensus.pb.h"
+#include "envoy/event/dispatcher.h"
 #include "envoy/http/header_map.h"
 
 #include "common/common/base64.h"
+
+#include "extensions/tracers/opencensus/exporters/zipkin_exporter.h"
 
 #include "absl/strings/str_cat.h"
 #include "google/devtools/cloudtrace/v2/tracing.grpc.pb.h"
@@ -247,9 +248,9 @@ void Span::setSampled(bool sampled) { span_.AddAnnotation("setSampled", {{"sampl
 } // namespace
 
 Driver::Driver(const envoy::config::trace::v3::OpenCensusConfig& oc_config,
-               const LocalInfo::LocalInfo& localinfo, Api::Api& api,
+               const LocalInfo::LocalInfo& local_info, Api::Api& api,
                Upstream::ClusterManager& cluster_manager, Event::Dispatcher& dispatcher)
-    : oc_config_(oc_config), local_info_(localinfo) {
+    : oc_config_(oc_config), local_info_(local_info) {
   // To give user a chance to correct initially invalid configuration and try to apply it once again
   // without a need to restart Envoy, validation checks must be done prior to any side effects.
   if (oc_config.stackdriver_exporter_enabled() && oc_config.has_stackdriver_grpc_service() &&
@@ -297,7 +298,8 @@ Driver::Driver(const envoy::config::trace::v3::OpenCensusConfig& oc_config,
     ::opencensus::exporters::trace::ZipkinExporterOptions opts(oc_config.zipkin_url());
     opts.service_name = local_info_.clusterName();
     ::opencensus::trace::exporter::SpanExporter::RegisterHandler(
-        std::make_unique<Exporters::ZipkinSpanExporterHandler>(dispatcher, cluster_manager));
+        std::make_unique<Exporters::ZipkinSpanExporterHandler>(dispatcher, cluster_manager,
+                                                               local_info));
   }
   if (oc_config.ocagent_exporter_enabled()) {
     ::opencensus::exporters::trace::OcAgentOptions opts;

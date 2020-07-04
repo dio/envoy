@@ -11,7 +11,7 @@
 #include "common/protobuf/utility.h"
 
 #include "extensions/tracers/zipkin/tracer_interface.h"
-#include "extensions/tracers/zipkin/util.h"
+#include "extensions/tracers/zipkin/utility.h"
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_replace.h"
@@ -40,7 +40,7 @@ public:
    * @param replacements A container that is used to hold the required replacements when this object
    * is serialized.
    */
-  virtual const ProtobufWkt::Struct toStruct(Util::Replacements& replacements) const PURE;
+  virtual const ProtobufWkt::Struct toStruct(Utility::Replacements& replacements) const PURE;
 
   /**
    * Serializes the a type as a Zipkin-compliant JSON representation as a string.
@@ -48,7 +48,7 @@ public:
    * @return a stringified JSON.
    */
   const std::string toJson() const {
-    Util::Replacements replacements;
+    Utility::Replacements replacements;
     return absl::StrReplaceAll(
         MessageUtil::getJsonStringFromMessage(toStruct(replacements), /* pretty_print */ false,
                                               /* always_print_primitive_fields */ true),
@@ -111,7 +111,7 @@ public:
    *
    * @return a protobuf struct.
    */
-  const ProtobufWkt::Struct toStruct(Util::Replacements& replacements) const override;
+  const ProtobufWkt::Struct toStruct(Utility::Replacements& replacements) const override;
 
 private:
   std::string service_name_;
@@ -203,7 +203,7 @@ public:
    *
    * @return a protobuf struct.
    */
-  const ProtobufWkt::Struct toStruct(Util::Replacements& replacements) const override;
+  const ProtobufWkt::Struct toStruct(Utility::Replacements& replacements) const override;
 
 private:
   uint64_t timestamp_{0};
@@ -301,7 +301,7 @@ public:
    * @param replacements Used to hold the required replacements on serialization step.
    * @return a protobuf struct.
    */
-  const ProtobufWkt::Struct toStruct(Util::Replacements& replacements) const override;
+  const ProtobufWkt::Struct toStruct(Utility::Replacements& replacements) const override;
 
 private:
   std::string key_;
@@ -465,7 +465,7 @@ public:
   /**
    * @return the span's id as a byte string.
    */
-  const std::string idAsByteString() const { return Util::toByteString(id_); }
+  const std::string idAsByteString() const { return Utility::toByteString(id_); }
 
   /**
    * @return the span's name.
@@ -489,7 +489,7 @@ public:
    */
   const std::string parentIdAsByteString() const {
     ASSERT(parent_id_);
-    return Util::toByteString(parent_id_.value());
+    return Utility::toByteString(parent_id_.value());
   }
 
   /**
@@ -532,9 +532,9 @@ public:
   const std::string traceIdAsByteString() const {
     // https://github.com/openzipkin/zipkin-api/blob/v0.2.1/zipkin.proto#L60-L61.
     return trace_id_high_.has_value()
-               ? absl::StrCat(Util::toBigEndianByteString(trace_id_high_.value()),
-                              Util::toBigEndianByteString(trace_id_))
-               : Util::toBigEndianByteString(trace_id_);
+               ? absl::StrCat(Utility::toBigEndianByteString(trace_id_high_.value()),
+                              Utility::toBigEndianByteString(trace_id_))
+               : Utility::toBigEndianByteString(trace_id_);
   }
 
   /**
@@ -557,7 +557,7 @@ public:
    *
    * @return a protobuf struct.
    */
-  const ProtobufWkt::Struct toStruct(Util::Replacements& replacements) const override;
+  const ProtobufWkt::Struct toStruct(Utility::Replacements& replacements) const override;
 
   /**
    * Associates a Tracer object with the span. The tracer's reportSpan() method is invoked
