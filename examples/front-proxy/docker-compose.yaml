@@ -6,7 +6,9 @@ services:
       context: .
       dockerfile: Dockerfile-frontenvoy
     volumes:
-      - ./front-envoy.yaml:/etc/front-envoy.yaml
+      - ./front-envoy-tls.yaml:/etc/front-envoy.yaml
+      - ./data/certs/crt.pem:/data/certs/crt.pem
+      - ./data/certs/key.pem:/data/certs/key.pem
     networks:
       - envoymesh
     expose:
