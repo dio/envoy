@@ -124,7 +124,7 @@ public:
 
 private:
   const std::vector<ProtobufWkt::Struct> toListOfSpans(const Span& zipkin_span,
-                                                       Util::Replacements& replacements) const;
+                                                       Utility::Replacements& replacements) const;
   const ProtobufWkt::Struct toProtoEndpoint(const Endpoint& zipkin_endpoint) const;
 
   const bool shared_span_context_;
