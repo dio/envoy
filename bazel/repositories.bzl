@@ -699,11 +699,7 @@ def _com_googlesource_quiche():
     )
 
 def _com_googlesource_googleurl():
-    _repository_impl(
-        name = "com_googlesource_googleurl",
-        patches = ["@envoy//bazel/external:googleurl.patch"],
-        patch_args = ["-p1"],
-    )
+    _repository_impl("com_googlesource_googleurl")
     native.bind(
         name = "googleurl",
         actual = "@com_googlesource_googleurl//url:url",
@@ -862,14 +858,11 @@ filegroup(
     )
 
 def _org_unicode_icuuc():
+    location = _get_location("org_unicode_icuuc")
+
     _repository_impl(
         name = "org_unicode_icuuc",
         build_file = "@envoy//bazel/external:icuuc.BUILD",
-        # TODO(dio): Consider patching udata when we need to embed some data.
-    )
-    native.bind(
-        name = "icuuc",
-        actual = "@org_unicode_icuuc//:common",
     )
 
 def _foreign_cc_dependencies():
