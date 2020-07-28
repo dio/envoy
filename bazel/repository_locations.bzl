@@ -416,8 +416,9 @@ DEPENDENCY_REPOSITORIES = dict(
     ),
     com_googlesource_googleurl = dict(
         # Static snapshot of https://quiche.googlesource.com/quiche/+archive/googleurl_6dafefa72cba2ab2ba4922d17a30618e9617c7cf.tar.gz
-        sha256 = "f1ab73ddd1a7db4e08a9e4db6c2e98e5a0a7bbaca08f5fee0d73adb02c24e44a",
-        urls = ["https://storage.googleapis.com/quiche-envoy-integration/googleurl_6dafefa72cba2ab2ba4922d17a30618e9617c7cf.tar.gz"],
+        sha256 = "b8ca343feb9aedf29259f25169deb70f93a151a2e4713be97d0da2c5e3737e18",
+        strip_prefix = "quiche-googleurl-1bd6372fe3d267b2790ba76a49290b8a0b2df46c",
+        urls = ["https://github.com/dio/quiche-googleurl/archive/1bd6372fe3d267b2790ba76a49290b8a0b2df46c.tar.gz"],
         use_category = ["dataplane"],
         cpe = "N/A",
     ),
@@ -475,9 +476,9 @@ DEPENDENCY_REPOSITORIES = dict(
         use_category = ["test"],
     ),
     org_unicode_icuuc = dict(
-        strip_prefix = "icu-release-64-2",
-        sha256 = "524960ac99d086cdb6988d2a92fc163436fd3c6ec0a84c475c6382fbf989be05",
-        urls = ["https://github.com/unicode-org/icu/archive/release-64-2.tar.gz"],
+        strip_prefix = "icu",
+        sha256 = "627d5d8478e6d96fc8c90fed4851239079a561a6a8b9e48b0892f24e82d31d6c",
+        urls = ["https://github.com/unicode-org/icu/releases/download/release-64-2/icu4c-64_2-src.tgz"],
         use_category = ["dataplane"],
         cpe = "cpe:2.3:a:icu-project:international_components_for_unicode",
     ),
