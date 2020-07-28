@@ -866,7 +866,6 @@ def _org_unicode_icuuc():
     http_archive(
         name = "org_unicode_icuuc",
         build_file_content = BUILD_ALL_CONTENT,
-        patches = ["@envoy//bazel/foreign_cc:icuuc.patch"],
         **location
     )
     native.bind(
