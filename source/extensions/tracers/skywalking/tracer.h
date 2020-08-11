@@ -11,12 +11,9 @@ namespace Extensions {
 namespace Tracers {
 namespace SkyWalking {
 
-// grpcAsyncClientManager().factoryForGrpcService(
-// grpc_service, server.scope(), false)
-
 class Tracer {
 public:
-  explicit Tracer(Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher, Stats::Scope& scope,
+  explicit Tracer(Upstream::ClusterManager& cm, Stats::Scope& scope, Event::Dispatcher& dispatcher,
                   const envoy::config::core::v3::GrpcService& grpc_service)
       : reporter_(std::make_unique<TraceSegmentReporter>(
             cm.grpcAsyncClientManager().factoryForGrpcService(grpc_service, scope, false),
