@@ -31,6 +31,7 @@ public:
     segment_object.set_traceid(span.segment_context_.trace_id_);
     sendTraceSegment(segment_object);
   }
+  void closeStream();
 
 private:
   void establishNewStream();

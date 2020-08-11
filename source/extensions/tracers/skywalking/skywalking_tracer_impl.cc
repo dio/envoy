@@ -24,8 +24,8 @@ public:
   void setSampled(bool sampled) override;
 
 private:
-  SpanObjectSegment span_;
   Tracer& tracer_;
+  SpanObjectSegment span_;
 };
 
 Driver::Driver(const envoy::config::trace::v3::SkyWalkingConfig& proto_config,

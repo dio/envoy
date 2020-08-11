@@ -21,6 +21,12 @@ void TraceSegmentReporter::sendTraceSegment(const SegmentObject& request) {
   }
 }
 
+void TraceSegmentReporter::closeStream() {
+  if (stream_ != nullptr) {
+    stream_->closeStream();
+  }
+}
+
 void TraceSegmentReporter::onRemoteClose(Grpc::Status::GrpcStatus, const std::string&) {
   stream_ = nullptr;
   handleFailure();

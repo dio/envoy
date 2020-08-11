@@ -4,6 +4,7 @@
 #include "extensions/tracers/skywalking/skywalking_types.h"
 
 #include <memory>
+#include <iostream>
 
 #include "envoy/common/pure.h"
 
@@ -19,6 +20,8 @@ public:
       : reporter_(std::make_unique<TraceSegmentReporter>(
             cm.grpcAsyncClientManager().factoryForGrpcService(grpc_service, scope, false),
             dispatcher)) {}
+
+  ~Tracer();
 
   void test(const SpanObjectSegment& span) { reporter_->test(span); }
 

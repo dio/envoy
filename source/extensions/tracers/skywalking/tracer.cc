@@ -3,7 +3,11 @@
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
-namespace SkyWalking {} // namespace SkyWalking
+namespace SkyWalking {
+
+Tracer::~Tracer() { reporter_->closeStream(); }
+
+} // namespace SkyWalking
 } // namespace Tracers
 } // namespace Extensions
 } // namespace Envoy
