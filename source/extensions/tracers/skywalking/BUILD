@@ -12,7 +12,18 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_cc_library(
-    name = "skywalking_lib",
+    name = "trace_segment_reporter_lib",
+    srcs = ["trace_segment_reporter.cc"],
+    hdrs = ["trace_segment_reporter.h"],
+    deps = [
+        "//include/envoy/grpc:async_client_manager_interface",
+        "//source/common/grpc:async_client_lib",
+        "@com_github_apache_skywalking_data_collect_protocol//:protocol_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "skywalking_tracer_lib",
     srcs = [
         "skywalking_tracer_impl.cc",
         "tracer.cc",
@@ -21,8 +32,8 @@ envoy_cc_library(
         "skywalking_tracer_impl.h",
         "tracer.h",
     ],
-    external_deps = [],
     deps = [
+        ":trace_segment_reporter_lib",
         "//include/envoy/common:time_interface",
         "//include/envoy/server:tracer_config_interface",
         "//include/envoy/tracing:http_tracer_interface",
@@ -40,7 +51,7 @@ envoy_cc_extension(
     security_posture = "robust_to_untrusted_downstream",
     status = "wip",
     deps = [
-        ":skywalking_lib",
+        ":skywalking_tracer_lib",
         "//source/common/config:datasource_lib",
         "//source/extensions/tracers/common:factory_base_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
