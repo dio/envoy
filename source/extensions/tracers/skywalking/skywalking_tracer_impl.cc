@@ -1,7 +1,9 @@
 #include "extensions/tracers/skywalking/skywalking_tracer_impl.h"
+#include "extensions/tracers/skywalking/skywalking_types.h"
 
 #include "common/common/macros.h"
 #include "common/common/utility.h"
+#include <memory>
 
 namespace Envoy {
 namespace Extensions {
@@ -10,7 +12,7 @@ namespace SkyWalking {
 
 class Span : public Tracing::Span {
 public:
-  Span(const Tracing::Config& config);
+  Span(const Tracing::Config& config, Tracer& tracer);
 
   void setOperation(absl::string_view operation) override;
   void setTag(absl::string_view name, absl::string_view value) override;
@@ -20,6 +22,10 @@ public:
   Tracing::SpanPtr spawnChild(const Tracing::Config& config, const std::string& name,
                               SystemTime start_time) override;
   void setSampled(bool sampled) override;
+
+private:
+  SpanObjectSegment span_;
+  Tracer& tracer_;
 };
 
 Driver::Driver(const envoy::config::trace::v3::SkyWalkingConfig& proto_config,
@@ -34,23 +40,33 @@ Driver::Driver(const envoy::config::trace::v3::SkyWalkingConfig& proto_config,
   });
 }
 
-Tracing::SpanPtr Driver::startSpan(const Tracing::Config&, Http::RequestHeaderMap&,
+Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config, Http::RequestHeaderMap&,
                                    const std::string&, Envoy::SystemTime, const Tracing::Decision) {
   auto* tracer = tls_slot_ptr_->getTyped<Driver::TlsTracer>().tracer_.get();
-  tracer->test();
-  return std::make_unique<Tracing::NullSpan>();
+  return std::make_unique<Span>(config, *tracer);
 }
 
-Span::Span(const Tracing::Config&) {}
+Span::Span(const Tracing::Config&, Tracer& tracer) : tracer_(tracer) {
+  span_.segment_context_ = SegmentContext{"id"};
+  span_.span_object_ = SpanObject{1};
+}
 
 void Span::setOperation(absl::string_view) {}
+
 void Span::setTag(absl::string_view, absl::string_view) {}
+
 void Span::log(SystemTime, const std::string&) {}
-void Span::finishSpan() {}
+
+void Span::finishSpan() {
+  tracer_.test(span_);
+}
+
 void Span::injectContext(Http::RequestHeaderMap&) {}
+
 Tracing::SpanPtr Span::spawnChild(const Tracing::Config&, const std::string&, SystemTime) {
   return std::make_unique<Tracing::NullSpan>();
 }
+
 void Span::setSampled(bool) {}
 
 } // namespace SkyWalking

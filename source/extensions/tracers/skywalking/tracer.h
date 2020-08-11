@@ -1,6 +1,7 @@
 #pragma once
 
 #include "extensions/tracers/skywalking/trace_segment_reporter.h"
+#include "extensions/tracers/skywalking/skywalking_types.h"
 
 #include <memory>
 
@@ -19,7 +20,7 @@ public:
             cm.grpcAsyncClientManager().factoryForGrpcService(grpc_service, scope, false),
             dispatcher)) {}
 
-  void test() { reporter_->test(); }
+  void test(const SpanObjectSegment& span) { reporter_->test(span); }
 
 private:
   TraceSegmentReporterPtr reporter_;

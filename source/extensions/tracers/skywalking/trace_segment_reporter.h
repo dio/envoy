@@ -1,5 +1,7 @@
 #pragma once
 
+#include "extensions/tracers/skywalking/skywalking_types.h"
+
 #include "common/grpc/async_client_impl.h"
 #include "envoy/grpc/async_client_manager.h"
 
@@ -24,7 +26,11 @@ public:
   void onRemoteClose(Grpc::Status::GrpcStatus, const std::string&) override;
 
   void sendTraceSegment(const SegmentObject& request);
-  void test() { sendTraceSegment(SegmentObject{}); }
+  void test(const SpanObjectSegment& span) {
+    SegmentObject segment_object;
+    segment_object.set_traceid(span.segment_context_.trace_id_);
+    sendTraceSegment(segment_object);
+  }
 
 private:
   void establishNewStream();
