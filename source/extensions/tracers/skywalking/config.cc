@@ -20,7 +20,7 @@ Tracing::HttpTracerSharedPtr SkyWalkingTracerFactory::createHttpTracerTyped(
     const envoy::config::trace::v3::SkyWalkingConfig& proto_config,
     Server::Configuration::TracerFactoryContext& context) {
   Tracing::DriverPtr skywalking_driver =
-      std::make_unique<SkyWalking::Driver>(proto_config, context.serverFactoryContext());
+      std::make_unique<SkyWalking::Driver>(proto_config, context);
   return std::make_shared<Tracing::HttpTracerImpl>(std::move(skywalking_driver),
                                                    context.serverFactoryContext().localInfo());
 }
