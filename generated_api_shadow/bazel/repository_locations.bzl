@@ -22,6 +22,9 @@ ZIPKINAPI_SHA256 = "688c4fe170821dd589f36ec45aaadc03a618a40283bc1f97da8fa11686fc
 RULES_PROTO_GIT_SHA = "2c0468366367d7ed97a1f702f9cd7155ab3f73c5"  # Nov 19, 2019
 RULES_PROTO_SHA256 = "73ebe9d15ba42401c785f9d0aeebccd73bd80bf6b8ac78f74996d31f2c0ad7a6"
 
+SKYWALKING_COLLECT_DATA_PROTOCOL_RELEASE = "8.1.0"
+SKYWALKING_COLLECT_DATA_PROTOCOL_SHA256 = "ebea8a6968722524d1bcc4426fb6a29907ddc2902aac7de1559012d3eee90cf9"
+
 REPOSITORY_LOCATIONS = dict(
     bazel_skylib = dict(
         sha256 = BAZEL_SKYLIB_SHA256,
@@ -62,5 +65,10 @@ REPOSITORY_LOCATIONS = dict(
         sha256 = ZIPKINAPI_SHA256,
         strip_prefix = "zipkin-api-" + ZIPKINAPI_RELEASE,
         urls = ["https://github.com/openzipkin/zipkin-api/archive/" + ZIPKINAPI_RELEASE + ".tar.gz"],
+    ),
+    com_github_apache_skywalking_data_collect_protocol = dict(
+        sha256 = SKYWALKING_COLLECT_DATA_PROTOCOL_SHA256,
+        strip_prefix = "skywalking-data-collect-protocol-" + SKYWALKING_COLLECT_DATA_PROTOCOL_RELEASE,
+        urls = ["https://github.com/apache/skywalking-data-collect-protocol/archive/v" + SKYWALKING_COLLECT_DATA_PROTOCOL_RELEASE + ".tar.gz"],
     ),
 )
