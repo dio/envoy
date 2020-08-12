@@ -32,8 +32,8 @@ std::string base64Decode(absl::string_view input) { return Base64::decode(std::s
 void SpanContext::initialize(Random::RandomGenerator& random_generator) {
   if (is_new_) {
     trace_id_ = generateId(random_generator);
-    trace_segment_id_ = generateId(random_generator);
   }
+  trace_segment_id_ = generateId(random_generator);
 }
 
 bool SpanContext::extract(Http::RequestHeaderMap& request_headers) {
@@ -54,11 +54,11 @@ bool SpanContext::extract(Http::RequestHeaderMap& request_headers) {
   sampled_ = parts[0] == "0" ? 0 : 1;
   trace_id_ = base64Decode(parts[1]);
   trace_segment_id_ = base64Decode(parts[2]);
-  parent_span_id_ = base64Decode(parts[3]);
+  parent_span_id_ = std::stoi(std::string(parts[3]));
   service_ = base64Decode(parts[4]);
   service_instance_ = base64Decode(parts[5]);
   parent_endpoint_ = base64Decode(parts[6]);
-  caller_address_ = base64Decode(parts[7]);
+  network_address_used_at_peer_ = base64Decode(parts[7]);
 
   is_new_ = false;
 
@@ -68,15 +68,17 @@ bool SpanContext::extract(Http::RequestHeaderMap& request_headers) {
 void SpanContext::inject(Http::RequestHeaderMap& request_headers) const {
   // Reference on standard header value:
   // https://github.com/apache/skywalking/blob/6fe2041b470113e626cb3f41e3789261d31f2548/docs/en/protocols/Skywalking-Cross-Process-Propagation-Headers-Protocol-v3.md#standard-header-item.
-  const auto value =
-      absl::StrCat(sampled_, "-", base64Encode(trace_id_), "-", base64Encode(trace_segment_id_),
-                   "-", base64Encode(parent_span_id_), "-", base64Encode(service_), "-",
-                   base64Encode(service_instance_), "-", base64Encode(parent_endpoint_), "-",
-                   base64Encode(caller_address_));
+  const auto value = absl::StrCat(
+      sampled_, "-", base64Encode(trace_id_), "-", base64Encode(trace_segment_id_), "-",
+      parent_span_id_, "-", base64Encode(service_), "-", base64Encode(service_instance_), "-",
+      base64Encode(parent_endpoint_), "-", base64Encode(network_address_used_at_peer_));
+  std::cerr << "value: " << value << "\n";
   request_headers.setReferenceKey(propagationHeader(), value);
 }
 
 void SpanObject::finish() { end_time_ = DateUtil::nowToMilliseconds(time_source_); }
+
+void SpanObject::updateContext() {}
 
 } // namespace SkyWalking
 } // namespace Tracers

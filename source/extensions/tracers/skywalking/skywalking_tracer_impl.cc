@@ -29,13 +29,17 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
                                    Envoy::SystemTime start_time, const Tracing::Decision) {
   auto& tracer = *tls_slot_ptr_->getTyped<Driver::TlsTracer>().tracer_;
 
-  SpanContext span_context;
-  const bool valid_context = span_context.extract(request_headers);
+  SpanContext previous_span_context;
+  const bool valid_context = previous_span_context.extract(request_headers);
   if (!valid_context) {
     return std::make_unique<Tracing::NullSpan>();
   }
 
-  return tracer.startSpan(span_context, config, start_time, Endpoint{request_headers});
+  if (previous_span_context.isNew()) {
+    return tracer.startSpan(config, start_time, request_headers);
+  }
+
+  return tracer.startSpan(config, start_time, previous_span_context);
 }
 
 } // namespace SkyWalking

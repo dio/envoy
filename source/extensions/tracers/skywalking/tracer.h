@@ -33,8 +33,14 @@ public:
 
   void report(const SpanObject& span_object);
 
-  Tracing::SpanPtr startSpan(const SpanContext& context, const Tracing::Config& config,
-                             SystemTime start_time, const Endpoint& endpoint);
+  Tracing::SpanPtr startSpan(const Tracing::Config& config, SystemTime start_time,
+                             Http::RequestHeaderMap& request_headers);
+
+  Tracing::SpanPtr startSpan(const Tracing::Config& config, SystemTime start_time,
+                             const SpanContext& previous_span_context);
+
+  const std::string& node() const { return node_; }
+  const std::string& service() const { return service_; }
 
 private:
   const std::string node_;

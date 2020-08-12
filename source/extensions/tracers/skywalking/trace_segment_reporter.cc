@@ -9,28 +9,42 @@ namespace {
 
 SegmentObject toSegmentObject(const SpanObject& span_object) {
   SegmentObject segment_object;
-  segment_object.set_traceid(span_object.span_context_.traceId());
-  segment_object.set_tracesegmentid(span_object.span_context_.traceSegmentId());
-  segment_object.set_service(span_object.span_context_.service());
-  segment_object.set_serviceinstance(span_object.span_context_.serviceInstance());
+  segment_object.set_traceid(span_object.context().traceId());
+  segment_object.set_tracesegmentid(span_object.context().traceSegmentId());
+  segment_object.set_service(span_object.context().service());
+  segment_object.set_serviceinstance(span_object.context().serviceInstance());
 
   auto* span = segment_object.mutable_spans()->Add();
-  span->set_parentspanid(span_object.parent_span_id_);
-  span->set_spanid(span_object.span_id_);
-  span->set_operationname(span_object.operation_name_);
   span->set_spanlayer(::SpanLayer::Http);
-  span->set_spantype(::SpanType::Entry);
-  span->set_componentid(span_object.component_id_);
-  span->set_starttime(span_object.start_time_);
-  span->set_endtime(span_object.end_time_);
-  span->set_iserror(span_object.is_error_);
+  span->set_spantype(span_object.spanType() == SpanType::Entry ? ::SpanType::Entry
+                                                               : ::SpanType::Exit);
+  span->set_componentid(6000);
+  span->set_starttime(span_object.startTime());
+  span->set_endtime(span_object.endTime());
+  span->set_iserror(span_object.isError());
+  span->set_operationname(span_object.operationName().empty()
+                              ? span_object.context().parentEndpoint()
+                              : span_object.operationName());
+  span->set_spanid(span_object.spanId());
+  span->set_parentspanid(span_object.parentSpanId());
 
-  for (const auto& span_tag : span_object.tags_) {
+  const auto& previous_context = span_object.previousContext();
+  if (!previous_context.isNew()) {
+    auto* ref = span->mutable_refs()->Add();
+    ref->set_traceid(previous_context.traceId());
+    ref->set_parenttracesegmentid(previous_context.traceSegmentId());
+    ref->set_parentspanid(previous_context.parentSpanId());
+    ref->set_parentservice(previous_context.service());
+    ref->set_parentserviceinstance(previous_context.serviceInstance());
+    ref->set_parentendpoint(previous_context.parentEndpoint());
+    ref->set_networkaddressusedatpeer(previous_context.networkAddressUsedAtPeer());
+  }
+
+  for (const auto& span_tag : span_object.tags()) {
     auto* tag = span->mutable_tags()->Add();
     tag->set_key(span_tag.first);
     tag->set_value(span_tag.second);
   }
-
   return segment_object;
 }
 

@@ -36,7 +36,6 @@ static_resources:
               - match:
                   prefix: "/"
                 route:
-                  host_rewrite: www.google.com
                   cluster: service_google
           http_filters:
           - name: envoy.filters.http.router
