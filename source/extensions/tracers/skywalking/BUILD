@@ -27,6 +27,14 @@ envoy_cc_library(
     name = "skywalking_types_lib",
     srcs = ["skywalking_types.cc"],
     hdrs = ["skywalking_types.h"],
+    deps = [
+        "//include/envoy/common:random_generator_interface",
+        "//include/envoy/common:time_interface",
+        "//include/envoy/http:header_map_interface",
+        "//source/common/common:base64_lib",
+        "//source/common/common:hex_lib",
+        "//source/common/common:utility_lib",
+    ],
 )
 
 envoy_cc_library(

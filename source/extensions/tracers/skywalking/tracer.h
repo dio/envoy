@@ -8,6 +8,8 @@
 
 #include "envoy/common/pure.h"
 
+#include "common/tracing/http_tracer_impl.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
@@ -15,21 +17,54 @@ namespace SkyWalking {
 
 class Tracer {
 public:
-  explicit Tracer(Upstream::ClusterManager& cm, Stats::Scope& scope, Event::Dispatcher& dispatcher,
+  explicit Tracer(Upstream::ClusterManager& cm, Stats::Scope& scope,
+                  const LocalInfo::LocalInfo& local_info, TimeSource& time_source,
+                  Random::RandomGenerator& random_generator, Event::Dispatcher& dispatcher,
                   const envoy::config::core::v3::GrpcService& grpc_service)
-      : reporter_(std::make_unique<TraceSegmentReporter>(
+      : node_(local_info.nodeName()), service_(local_info.clusterName()),
+        address_(absl::StrCat(local_info.address()->asString(), ":",
+                              local_info.address()->ip()->port())),
+        time_source_(time_source), random_generator_(random_generator),
+        reporter_(std::make_unique<TraceSegmentReporter>(
             cm.grpcAsyncClientManager().factoryForGrpcService(grpc_service, scope, false),
             dispatcher)) {}
 
   ~Tracer();
 
-  void test(const SpanObjectSegment& span) { reporter_->test(span); }
+  void report(const SpanObject& span_object);
+
+  Tracing::SpanPtr startSpan(const SpanContext& context, const Tracing::Config& config,
+                             SystemTime start_time, const Endpoint& endpoint);
 
 private:
+  const std::string node_;
+  const std::string service_;
+  const std::string address_;
+
+  TimeSource& time_source_;
+  Random::RandomGenerator& random_generator_;
   TraceSegmentReporterPtr reporter_;
 };
 
 using TracerPtr = std::unique_ptr<Tracer>;
+
+class Span : public Tracing::Span {
+public:
+  Span(SpanObject span_object, Tracer& tracer);
+
+  void setOperation(absl::string_view operation) override;
+  void setTag(absl::string_view name, absl::string_view value) override;
+  void log(SystemTime timestamp, const std::string& event) override;
+  void finishSpan() override;
+  void injectContext(Http::RequestHeaderMap& request_headers) override;
+  Tracing::SpanPtr spawnChild(const Tracing::Config& config, const std::string& name,
+                              SystemTime start_time) override;
+  void setSampled(bool sampled) override;
+
+private:
+  SpanObject span_object_;
+  Tracer& tracer_;
+};
 
 } // namespace SkyWalking
 } // namespace Tracers

@@ -25,15 +25,11 @@ public:
   void onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&&) override {}
   void onRemoteClose(Grpc::Status::GrpcStatus, const std::string&) override;
 
-  void sendTraceSegment(const SegmentObject& request);
-  void test(const SpanObjectSegment& span) {
-    SegmentObject segment_object;
-    segment_object.set_traceid(span.segment_context_.trace_id_);
-    sendTraceSegment(segment_object);
-  }
   void closeStream();
+  void report(const SpanObject& span_object);
 
 private:
+  void sendTraceSegment(const SegmentObject& request);
   void establishNewStream();
   void handleFailure();
   void setRetryTimer();
