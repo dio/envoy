@@ -35,11 +35,16 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
     return std::make_unique<Tracing::NullSpan>();
   }
 
+  SpanContext span_context;
+  span_context.setEndpoint(Endpoint{request_headers});
+  span_context.setService(tracer.service());
+  span_context.setServiceInstance(tracer.node());
+
   if (previous_span_context.isNew()) {
-    return tracer.startSpan(config, start_time, request_headers);
+    return tracer.startSpan(config, start_time, span_context, SpanContext{});
   }
 
-  return tracer.startSpan(config, start_time, previous_span_context);
+  return tracer.startSpan(config, start_time, span_context, previous_span_context);
 }
 
 } // namespace SkyWalking

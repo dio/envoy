@@ -47,6 +47,8 @@ public:
   void setEndpoint(const Endpoint& endpoint) {
     parent_endpoint_ = endpoint.methodAndPath();
     network_address_used_at_peer_ = endpoint.host();
+    std::cerr << "setEndpoint: " << parent_endpoint_ << " - " << network_address_used_at_peer_
+              << "\n";
   }
 
   int sampled() const { return sampled_; }
@@ -97,10 +99,13 @@ struct Log {
 class SpanObject {
 
 public:
-  explicit SpanObject(const SpanContext& previous_span_context, TimeSource& time_source,
-                      Random::RandomGenerator& random_generator)
-      : previous_span_context_(previous_span_context), time_source_(time_source) {
-    span_context_ = previous_span_context_;
+  explicit SpanObject(const SpanContext& span_context, const SpanContext& previous_span_context,
+                      TimeSource& time_source, Random::RandomGenerator& random_generator)
+      : span_context_(span_context), previous_span_context_(previous_span_context),
+        time_source_(time_source) {
+    if (!previous_span_context.isNew()) {
+      span_context_.setTraceId(previous_span_context.traceId());
+    }
     span_context_.initialize(random_generator);
   }
 
@@ -113,6 +118,7 @@ public:
   void setOperationName(const std::string& operation_name) { operation_name_ = operation_name; }
   void setIsError(bool is_error) { is_error_ = is_error; }
   void setSpanType(SpanType span_type) { span_type_ = span_type; }
+  void setPeer(const std::string& peer) { peer_ = peer; }
   void addTag(const Tag& tag) { tags_.push_back(tag); }
   void addLog(const Log& log) { logs_.push_back(log); }
 
@@ -130,6 +136,7 @@ public:
   const std::vector<Log>& logs() const { return logs_; }
   int32_t spanId() const { return span_id_; }
   int32_t parentSpanId() const { return parent_span_id_; }
+  const std::string& peer() const { return peer_; }
 
   SpanType spanType() const { return span_type_; }
   SpanLayer spanLayer() const { return span_layer_; }
@@ -145,6 +152,7 @@ private:
   uint64_t end_time_;
 
   std::string operation_name_;
+  std::string peer_;
 
   bool is_error_{false};
 

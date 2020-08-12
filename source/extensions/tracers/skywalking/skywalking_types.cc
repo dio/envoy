@@ -30,7 +30,7 @@ std::string base64Decode(absl::string_view input) { return Base64::decode(std::s
 } // namespace
 
 void SpanContext::initialize(Random::RandomGenerator& random_generator) {
-  if (is_new_) {
+  if (trace_id_.empty()) {
     trace_id_ = generateId(random_generator);
   }
   trace_segment_id_ = generateId(random_generator);

@@ -16,8 +16,13 @@ SegmentObject toSegmentObject(const SpanObject& span_object) {
 
   auto* span = segment_object.mutable_spans()->Add();
   span->set_spanlayer(::SpanLayer::Http);
-  span->set_spantype(span_object.spanType() == SpanType::Entry ? ::SpanType::Entry
-                                                               : ::SpanType::Exit);
+  span->set_spantype(span_object.spanType() == SpanType::Exit ? ::SpanType::Exit
+                                                              : ::SpanType::Entry);
+
+  if (span_object.spanType() == SpanType::Exit) {
+    span->set_peer(span_object.peer());
+  }
+
   span->set_componentid(6000);
   span->set_starttime(span_object.startTime());
   span->set_endtime(span_object.endTime());

@@ -18,23 +18,9 @@ uint64_t getTimestamp(SystemTime time) {
 } // namespace
 
 Tracing::SpanPtr Tracer::startSpan(const Tracing::Config& config, SystemTime start_time,
-                                   Http::RequestHeaderMap& request_headers) {
-  SpanContext span_context;
-  span_context.setEndpoint(Endpoint{request_headers});
-  span_context.setService(service_);
-  span_context.setServiceInstance(node_);
-
-  SpanObject span_object(span_context, time_source_, random_generator_);
-  span_object.setSpanType(
-      config.operationName() == Tracing::OperationName::Egress ? SpanType::Exit : SpanType::Entry);
-  span_object.setStartTime(getTimestamp(start_time));
-
-  return std::make_unique<Span>(span_object, *this);
-}
-
-Tracing::SpanPtr Tracer::startSpan(const Tracing::Config& config, SystemTime start_time,
+                                   const SpanContext& span_context,
                                    const SpanContext& previous_context) {
-  SpanObject span_object(previous_context, time_source_, random_generator_);
+  SpanObject span_object(span_context, previous_context, time_source_, random_generator_);
   span_object.setSpanType(
       config.operationName() == Tracing::OperationName::Egress ? SpanType::Exit : SpanType::Entry);
   span_object.setStartTime(getTimestamp(start_time));
@@ -63,16 +49,15 @@ void Span::setTag(absl::string_view name, absl::string_view value) {
     span_object_.setIsError(value == Tracing::Tags::get().True ? true : false);
   }
 
+  if (name == Tracing::Tags::get().PeerAddress && span_object_.spanType() == SpanType::Exit) {
+    std::cerr << "peer: " << std::string(value) << "\n";
+    span_object_.setPeer(std::string(value));
+  }
+
   span_object_.addTag({std::string(name), std::string(value)});
 }
 
-void Span::log(SystemTime, const std::string&) {
-  /*const uint64_t event_timestamp = getTimestamp(timestamp);
-  const Tag tag{event, absl::StrCat(event_timestamp)};
-  const Log log{event_timestamp, {tag}};
-  span_object_.logs_.push_back(log);
-  */
-}
+void Span::log(SystemTime, const std::string&) {}
 
 void Span::finishSpan() {
   span_object_.finish();
@@ -85,7 +70,8 @@ void Span::injectContext(Http::RequestHeaderMap& request_headers) {
 
 Tracing::SpanPtr Span::spawnChild(const Tracing::Config& config, const std::string&,
                                   SystemTime start_time) {
-  return tracer_.startSpan(config, start_time, span_object_.context());
+  return tracer_.startSpan(config, start_time, span_object_.context(),
+                           span_object_.previousContext());
 }
 
 void Span::setSampled(bool) {}
