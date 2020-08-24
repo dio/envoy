@@ -1,9 +1,11 @@
 #include "extensions/tracers/skywalking/skywalking_tracer_impl.h"
-#include "extensions/tracers/skywalking/skywalking_types.h"
+
+#include <memory>
 
 #include "common/common/macros.h"
 #include "common/common/utility.h"
-#include <memory>
+
+#include "extensions/tracers/skywalking/skywalking_types.h"
 
 namespace Envoy {
 namespace Extensions {

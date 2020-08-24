@@ -1,11 +1,12 @@
 #pragma once
 
 #include <stdint.h>
+
 #include <string>
 
-#include "envoy/http/header_map.h"
-#include "envoy/common/time.h"
 #include "envoy/common/random_generator.h"
+#include "envoy/common/time.h"
+#include "envoy/http/header_map.h"
 
 namespace Envoy {
 namespace Extensions {

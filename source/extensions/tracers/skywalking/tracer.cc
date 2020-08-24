@@ -1,4 +1,5 @@
 #include "extensions/tracers/skywalking/tracer.h"
+
 #include <chrono>
 
 namespace Envoy {

@@ -1,14 +1,14 @@
 #pragma once
 
-#include "extensions/tracers/skywalking/trace_segment_reporter.h"
-#include "extensions/tracers/skywalking/skywalking_types.h"
-
-#include <memory>
 #include <iostream>
+#include <memory>
 
 #include "envoy/common/pure.h"
 
 #include "common/tracing/http_tracer_impl.h"
+
+#include "extensions/tracers/skywalking/skywalking_types.h"
+#include "extensions/tracers/skywalking/trace_segment_reporter.h"
 
 namespace Envoy {
 namespace Extensions {

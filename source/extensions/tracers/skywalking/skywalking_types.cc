@@ -1,9 +1,9 @@
 #include "extensions/tracers/skywalking/skywalking_types.h"
 
 #include "common/common/base64.h"
-#include "common/common/utility.h"
-#include "common/common/hex.h"
 #include "common/common/fmt.h"
+#include "common/common/hex.h"
+#include "common/common/utility.h"
 
 namespace Envoy {
 namespace Extensions {
