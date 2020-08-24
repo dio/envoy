@@ -76,6 +76,10 @@ Tracing::SpanPtr Span::spawnChild(const Tracing::Config& config, const std::stri
 
 void Span::setSampled(bool) {}
 
+std::string Span::getBaggage(absl::string_view) { return EMPTY_STRING; }
+
+void Span::setBaggage(absl::string_view, absl::string_view) {}
+
 } // namespace SkyWalking
 } // namespace Tracers
 } // namespace Extensions

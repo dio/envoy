@@ -64,6 +64,8 @@ public:
   Tracing::SpanPtr spawnChild(const Tracing::Config& config, const std::string& name,
                               SystemTime start_time) override;
   void setSampled(bool sampled) override;
+  std::string getBaggage(absl::string_view key) override;
+  void setBaggage(absl::string_view key, absl::string_view value) override;
 
 private:
   SpanObject span_object_;
