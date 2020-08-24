@@ -21,8 +21,7 @@ Tracing::SpanPtr Tracer::startSpan(const Tracing::Config& config, SystemTime sta
                                    const SpanContext& span_context,
                                    const SpanContext& previous_context) {
   SpanObject span_object(span_context, previous_context, time_source_, random_generator_);
-  span_object.setSpanType(
-      config.operationName() == Tracing::OperationName::Egress ? SpanType::Exit : SpanType::Entry);
+  span_object.setAsEntrySpan(config.operationName() == Tracing::OperationName::Ingress);
   span_object.setStartTime(getTimestamp(start_time));
 
   return std::make_unique<Span>(span_object, *this);
@@ -46,11 +45,11 @@ void Span::setTag(absl::string_view name, absl::string_view value) {
   }
 
   if (name == Tracing::Tags::get().Error) {
-    span_object_.setIsError(value == Tracing::Tags::get().True ? true : false);
+    span_object_.setAsError(value == Tracing::Tags::get().True);
   }
 
-  if (name == Tracing::Tags::get().PeerAddress && span_object_.spanType() == SpanType::Exit) {
-    std::cerr << "peer: " << std::string(value) << "\n";
+  if (name == Tracing::Tags::get().PeerAddress && !span_object_.isEntrySpan()) {
+    // Set perr when it is an exit span.
     span_object_.setPeer(std::string(value));
   }
 

@@ -15,11 +15,11 @@ SegmentObject toSegmentObject(const SpanObject& span_object) {
   segment_object.set_serviceinstance(span_object.context().serviceInstance());
 
   auto* span = segment_object.mutable_spans()->Add();
-  span->set_spanlayer(::SpanLayer::Http);
-  span->set_spantype(span_object.spanType() == SpanType::Exit ? ::SpanType::Exit
-                                                              : ::SpanType::Entry);
+  // The SpanLayer is always Http.
+  span->set_spanlayer(SpanLayer::Http);
+  span->set_spantype(span_object.isEntrySpan() ? SpanType::Entry : SpanType::Exit);
 
-  if (span_object.spanType() == SpanType::Exit) {
+  if (!span_object.peer().empty()) {
     span->set_peer(span_object.peer());
   }
 
@@ -69,7 +69,7 @@ void TraceSegmentReporter::report(const SpanObject& span_object) {
 }
 
 void TraceSegmentReporter::sendTraceSegment(const SegmentObject& request) {
-  // TODO(dio): Buffer when stream is not yet established.
+  // TODO(dio): Buffer when stream is not yet established
   if (stream_ != nullptr) {
     stream_->sendMessage(request, false);
   }

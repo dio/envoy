@@ -36,7 +36,7 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
   }
 
   SpanContext span_context;
-  span_context.setEndpoint(Endpoint{request_headers});
+  span_context.setParentEndpointAndNetworkAddressUsedAtPeer(Endpoint{request_headers});
   span_context.setService(tracer.service());
   span_context.setServiceInstance(tracer.node());
 
