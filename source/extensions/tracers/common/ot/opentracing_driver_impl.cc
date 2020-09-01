@@ -126,6 +126,7 @@ void OpenTracingSpan::injectContext(Http::RequestHeaderMap& request_headers) {
         ot_span_context_handle.handle(),
         Base64::encode(current_span_context.c_str(), current_span_context.length()));
   } else {
+    std::cerr << "injectContext\n";
     // Inject the context using the tracer's standard HTTP header format.
     const OpenTracingHTTPHeadersWriter writer{request_headers};
     const opentracing::expected<void> was_successful =
