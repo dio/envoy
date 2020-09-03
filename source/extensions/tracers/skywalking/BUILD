@@ -4,6 +4,7 @@ load(
     "envoy_cc_library",
     "envoy_extension_package",
 )
+load("@com_google_protobuf//:protobuf.bzl", "cc_proto_library")
 
 licenses(["notice"])  # Apache 2
 
@@ -16,10 +17,10 @@ envoy_cc_library(
     srcs = ["trace_segment_reporter.cc"],
     hdrs = ["trace_segment_reporter.h"],
     deps = [
+        ":collector",
         ":skywalking_types_lib",
         "//include/envoy/grpc:async_client_manager_interface",
         "//source/common/grpc:async_client_lib",
-        "@com_github_apache_skywalking_data_collect_protocol//:protocol_cc_proto",
     ],
 )
 
@@ -31,6 +32,7 @@ envoy_cc_library(
         "//include/envoy/common:random_generator_interface",
         "//include/envoy/common:time_interface",
         "//include/envoy/http:header_map_interface",
+        "//include/envoy/tracing:http_tracer_interface",
         "//source/common/common:base64_lib",
         "//source/common/common:hex_lib",
         "//source/common/common:utility_lib",
@@ -69,8 +71,19 @@ envoy_cc_extension(
     status = "wip",
     deps = [
         ":skywalking_tracer_lib",
-        "//source/common/config:datasource_lib",
         "//source/extensions/tracers/common:factory_base_lib",
         "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
     ],
+)
+
+# Apache SkyWalking data collect protocol (https://github.com/apache/skywalking-data-collect-protocol).
+cc_proto_library(
+    name = "collector",
+    srcs = [
+        "collector/common.proto",
+        "collector/tracing.proto",
+    ],
+    default_runtime = "@com_google_protobuf//:protobuf",
+    protoc = "@com_google_protobuf//:protoc",
+    visibility = ["//visibility:private"],
 )

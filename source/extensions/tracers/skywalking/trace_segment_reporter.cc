@@ -23,6 +23,7 @@ SegmentObject toSegmentObject(const SpanObject& span_object) {
     span->set_peer(span_object.peer());
   }
 
+  // TODO(dio): This is hardcoded as Nginx, since SkyWalking has no ID for Envoy yet.
   span->set_componentid(6000);
   span->set_starttime(span_object.startTime());
   span->set_endtime(span_object.endTime());
@@ -34,15 +35,15 @@ SegmentObject toSegmentObject(const SpanObject& span_object) {
   span->set_parentspanid(span_object.parentSpanId());
 
   const auto& previous_context = span_object.previousContext();
-  if (!previous_context.isNew()) {
+  if (previous_context) {
     auto* ref = span->mutable_refs()->Add();
-    ref->set_traceid(previous_context.traceId());
-    ref->set_parenttracesegmentid(previous_context.traceSegmentId());
-    ref->set_parentspanid(previous_context.parentSpanId());
-    ref->set_parentservice(previous_context.service());
-    ref->set_parentserviceinstance(previous_context.serviceInstance());
-    ref->set_parentendpoint(previous_context.parentEndpoint());
-    ref->set_networkaddressusedatpeer(previous_context.networkAddressUsedAtPeer());
+    ref->set_traceid(previous_context.value().traceId());
+    ref->set_parenttracesegmentid(previous_context.value().traceSegmentId());
+    ref->set_parentspanid(previous_context.value().parentSpanId());
+    ref->set_parentservice(previous_context.value().service());
+    ref->set_parentserviceinstance(previous_context.value().serviceInstance());
+    ref->set_parentendpoint(previous_context.value().parentEndpoint());
+    ref->set_networkaddressusedatpeer(previous_context.value().networkAddressUsedAtPeer());
   }
 
   for (const auto& span_tag : span_object.tags()) {

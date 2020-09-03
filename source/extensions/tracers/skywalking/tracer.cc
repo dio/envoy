@@ -20,11 +20,16 @@ uint64_t getTimestamp(SystemTime time) {
 
 Tracing::SpanPtr Tracer::startSpan(const Tracing::Config& config, SystemTime start_time,
                                    const SpanContext& span_context,
-                                   const SpanContext& previous_context) {
-  SpanObject span_object(span_context, previous_context, time_source_, random_generator_);
+                                   const SpanContextResult& previous_span_context) {
+  if (!previous_span_context.to_trace_) {
+    // TODO(dio): Probably sending non-sampled span will be helpful.
+    return std::make_unique<Tracing::NullSpan>();
+  }
+
+  SpanObject span_object(span_context, previous_span_context.context_, time_source_,
+                         random_generator_);
   span_object.setAsEntrySpan(config.operationName() == Tracing::OperationName::Ingress);
   span_object.setStartTime(getTimestamp(start_time));
-
   return std::make_unique<Span>(span_object, *this);
 }
 
@@ -71,7 +76,7 @@ void Span::injectContext(Http::RequestHeaderMap& request_headers) {
 Tracing::SpanPtr Span::spawnChild(const Tracing::Config& config, const std::string&,
                                   SystemTime start_time) {
   return tracer_.startSpan(config, start_time, span_object_.context(),
-                           span_object_.previousContext());
+                           SpanContextResult{span_object_.previousContext()});
 }
 
 void Span::setSampled(bool) {}

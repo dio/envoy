@@ -35,7 +35,7 @@ public:
 
   Tracing::SpanPtr startSpan(const Tracing::Config& config, SystemTime start_time,
                              const SpanContext& span_context,
-                             const SpanContext& previous_span_context);
+                             const SpanContextResult& previous_span_context);
 
   const std::string& node() const { return node_; }
   const std::string& service() const { return service_; }

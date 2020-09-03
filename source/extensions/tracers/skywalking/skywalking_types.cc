@@ -38,11 +38,14 @@ void SpanContext::initialize(Random::RandomGenerator& random_generator) {
   trace_segment_id_ = generateId(random_generator);
 }
 
-bool SpanContext::extract(Http::RequestHeaderMap& request_headers) {
+const SpanContextResult SpanContext::extract(Http::RequestHeaderMap& request_headers,
+                                             const Tracing::Decision tracing_decision) {
   auto propagation_header = request_headers.get(propagationHeader());
+  SpanContextResult result;
+  result.to_trace_ = tracing_decision.traced;
   if (propagation_header == nullptr) {
     // No propagation_header means a valid span context, but an empty one.
-    return true;
+    return result;
   }
 
   const auto parts =
@@ -50,22 +53,23 @@ bool SpanContext::extract(Http::RequestHeaderMap& request_headers) {
   // Reference:
   // https://github.com/apache/skywalking/blob/6fe2041b470113e626cb3f41e3789261d31f2548/docs/en/protocols/Skywalking-Cross-Process-Propagation-Headers-Protocol-v3.md#values.
   if (parts.size() != 8) {
-    return false;
+    result.to_trace_ = false;
+    return result;
   }
 
+  SpanContext span_context(parts[0] == "1" ? 1 : 0);
+
   // TODO(dio): Per part validation.
-  sampled_ = parts[0] == "0" ? 0 : 1;
-  trace_id_ = base64Decode(parts[1]);
-  trace_segment_id_ = base64Decode(parts[2]);
-  parent_span_id_ = std::stoi(std::string(parts[3]));
-  service_ = base64Decode(parts[4]);
-  service_instance_ = base64Decode(parts[5]);
-  parent_endpoint_ = base64Decode(parts[6]);
-  network_address_used_at_peer_ = base64Decode(parts[7]);
+  span_context.setTraceId(base64Decode(parts[1]));
+  span_context.setTraceSegmentId(base64Decode(parts[2]));
+  span_context.setParentSpanId(std::stoi(std::string(parts[3])));
+  span_context.setService(base64Decode(parts[4]));
+  span_context.setServiceInstance(base64Decode(parts[5]));
+  span_context.setParentEndpoint(base64Decode(parts[6]));
+  span_context.setNetworkAddressUsedAtPeer(base64Decode(parts[7]));
 
-  is_new_ = false;
-
-  return true;
+  result.context_ = absl::optional<SpanContext>(span_context);
+  return result;
 }
 
 void SpanContext::inject(Http::RequestHeaderMap& request_headers) const {

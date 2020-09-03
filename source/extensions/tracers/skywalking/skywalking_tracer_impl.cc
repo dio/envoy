@@ -28,25 +28,12 @@ Driver::Driver(const envoy::config::trace::v3::SkyWalkingConfig& proto_config,
 
 Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
                                    Http::RequestHeaderMap& request_headers, const std::string&,
-                                   Envoy::SystemTime start_time, const Tracing::Decision) {
+                                   Envoy::SystemTime start_time,
+                                   const Tracing::Decision tracing_decision) {
   auto& tracer = *tls_slot_ptr_->getTyped<Driver::TlsTracer>().tracer_;
-
-  SpanContext previous_span_context;
-  const bool valid_context = previous_span_context.extract(request_headers);
-  if (!valid_context) {
-    return std::make_unique<Tracing::NullSpan>();
-  }
-
-  SpanContext span_context;
-  span_context.setParentEndpointAndNetworkAddressUsedAtPeer(Endpoint{request_headers});
-  span_context.setService(tracer.service());
-  span_context.setServiceInstance(tracer.node());
-
-  if (previous_span_context.isNew()) {
-    return tracer.startSpan(config, start_time, span_context, SpanContext{});
-  }
-
-  return tracer.startSpan(config, start_time, span_context, previous_span_context);
+  return tracer.startSpan(config, start_time,
+                          SpanContext{Endpoint{request_headers}, tracer.service(), tracer.node()},
+                          SpanContext::extract(request_headers, tracing_decision));
 }
 
 } // namespace SkyWalking

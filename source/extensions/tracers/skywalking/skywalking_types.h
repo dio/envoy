@@ -7,6 +7,7 @@
 #include "envoy/common/random_generator.h"
 #include "envoy/common/time.h"
 #include "envoy/http/header_map.h"
+#include "envoy/tracing/http_tracer.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -28,12 +29,24 @@ private:
   const std::string method_and_path_;
 };
 
+struct SpanContextResult;
+
 class SpanContext {
 
 public:
+  explicit SpanContext(const Endpoint& endpoint, const std::string& service,
+                       const std::string& service_instance)
+      : service_(service), service_instance_(service_instance) {
+    setParentEndpointAndNetworkAddressUsedAtPeer(endpoint);
+  }
+
+  explicit SpanContext(bool sampled) : sampled_(sampled ? 1 : 0) {}
+
   void initialize(Random::RandomGenerator& random_generator);
-  bool extract(Http::RequestHeaderMap& request_headers);
   void inject(Http::RequestHeaderMap& request_headers) const;
+
+  static const SpanContextResult extract(Http::RequestHeaderMap& request_headers,
+                                         const Tracing::Decision tracing_decision);
 
   void setSampled(bool sampled) { sampled_ = sampled ? 1 : 0; }
   void setParentSpanId(int parent_span_id) { parent_span_id_ = parent_span_id; }
@@ -44,6 +57,10 @@ public:
   void setService(const std::string& service) { service_ = service; }
   void setServiceInstance(const std::string& service_instance) {
     service_instance_ = service_instance;
+  }
+  void setParentEndpoint(const std::string& parent_endpoint) { parent_endpoint_ = parent_endpoint; }
+  void setNetworkAddressUsedAtPeer(const std::string& network_address_used_at_peer) {
+    network_address_used_at_peer_ = network_address_used_at_peer;
   }
   void setParentEndpointAndNetworkAddressUsedAtPeer(const Endpoint& endpoint) {
     parent_endpoint_ = endpoint.methodAndPath();
@@ -59,8 +76,6 @@ public:
   const std::string& parentEndpoint() const { return parent_endpoint_; }
   const std::string& networkAddressUsedAtPeer() const { return network_address_used_at_peer_; }
 
-  bool isNew() const { return is_new_; }
-
 private:
   int sampled_{1};
   int parent_span_id_{0};
@@ -73,8 +88,11 @@ private:
   std::string parent_endpoint_;
   // The address used for calling this endpoint.
   std::string network_address_used_at_peer_;
+};
 
-  bool is_new_{true};
+struct SpanContextResult {
+  absl::optional<SpanContext> context_;
+  bool to_trace_{true};
 };
 
 using Tag = std::pair<std::string, std::string>;
@@ -87,12 +105,13 @@ struct Log {
 class SpanObject {
 
 public:
-  explicit SpanObject(const SpanContext& span_context, const SpanContext& previous_span_context,
+  explicit SpanObject(const SpanContext& span_context,
+                      const absl::optional<SpanContext>& previous_span_context,
                       TimeSource& time_source, Random::RandomGenerator& random_generator)
       : span_context_(span_context), previous_span_context_(previous_span_context),
         time_source_(time_source) {
-    if (!previous_span_context.isNew()) {
-      span_context_.setTraceId(previous_span_context.traceId());
+    if (previous_span_context) {
+      span_context_.setTraceId(previous_span_context.value().traceId());
     }
     span_context_.initialize(random_generator);
   }
@@ -111,7 +130,7 @@ public:
   void addLog(const Log& log) { logs_.push_back(log); }
 
   const SpanContext& context() const { return span_context_; }
-  const SpanContext& previousContext() const { return previous_span_context_; }
+  const absl::optional<SpanContext>& previousContext() const { return previous_span_context_; }
 
   const std::string& operationName() const { return operation_name_; }
   uint64_t startTime() const { return start_time_; }
@@ -129,7 +148,7 @@ public:
 
 private:
   SpanContext span_context_;
-  SpanContext previous_span_context_;
+  const absl::optional<SpanContext>& previous_span_context_;
 
   int32_t span_id_{0};
   int32_t parent_span_id_{-1};

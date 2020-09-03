@@ -2,12 +2,12 @@
 
 #include "envoy/grpc/async_client_manager.h"
 
-#include "common/Common.pb.h"
 #include "common/grpc/async_client_impl.h"
 
 #include "extensions/tracers/skywalking/skywalking_types.h"
 
-#include "language-agent/Tracing.pb.h"
+#include "source/extensions/tracers/skywalking/collector/common.pb.h"
+#include "source/extensions/tracers/skywalking/collector/tracing.pb.h"
 
 namespace Envoy {
 namespace Extensions {
