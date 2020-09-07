@@ -75,8 +75,8 @@ void Span::injectContext(Http::RequestHeaderMap& request_headers) {
 
 Tracing::SpanPtr Span::spawnChild(const Tracing::Config& config, const std::string&,
                                   SystemTime start_time) {
-  return tracer_.startSpan(config, start_time, span_object_.context(),
-                           SpanContextResult{span_object_.previousContext()});
+  return tracer_.startSpan(config, start_time, SpanContext{true},
+                           SpanContextResult{span_object_.context()});
 }
 
 void Span::setSampled(bool) {}
