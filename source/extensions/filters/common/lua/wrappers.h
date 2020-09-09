@@ -17,10 +17,10 @@ namespace Lua {
  */
 class BufferWrapper : public BaseLuaObject<BufferWrapper> {
 public:
-  BufferWrapper(const Buffer::Instance& data) : data_(data) {}
+  BufferWrapper(Buffer::Instance& data) : data_(data) {}
 
   static ExportedFunctions exportedFunctions() {
-    return {{"length", static_luaLength}, {"getBytes", static_luaGetBytes}};
+    return {{"length", static_luaLength}, {"getBytes", static_luaGetBytes}, {"set", static_luaSet}};
   }
 
 private:
@@ -37,7 +37,9 @@ private:
    */
   DECLARE_LUA_FUNCTION(BufferWrapper, luaGetBytes);
 
-  const Buffer::Instance& data_;
+  DECLARE_LUA_FUNCTION(BufferWrapper, luaSet);
+
+  Buffer::Instance& data_;
 };
 
 class MetadataMapWrapper;

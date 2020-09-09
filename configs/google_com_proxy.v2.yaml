@@ -31,6 +31,16 @@ static_resources:
                   host_rewrite: www.google.com
                   cluster: service_google
           http_filters:
+          - name: envoy.filters.http.lua
+            typed_config:
+              "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
+              inline_code: |
+                function envoy_on_request(request_handle)
+                end
+                function envoy_on_response(response_handle)
+                  response_handle:headers():replace("content-length", 6)
+                  response_handle:body():set("hello\n")
+                end
           - name: envoy.filters.http.router
   clusters:
   - name: service_google

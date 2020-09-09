@@ -65,6 +65,13 @@ int BufferWrapper::luaGetBytes(lua_State* state) {
   return 1;
 }
 
+int BufferWrapper::luaSet(lua_State* state) {
+  data_.drain(data_.length());
+  absl::string_view body = luaL_checkstring(state, 2);
+  data_.add(body);
+  return 0;
+}
+
 void MetadataMapHelper::setValue(lua_State* state, const ProtobufWkt::Value& value) {
   ProtobufWkt::Value::KindCase kind = value.kind_case();
 
