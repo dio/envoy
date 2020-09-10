@@ -97,7 +97,7 @@ message AttributeContext {
 
   // This message defines attributes for an HTTP request.
   // HTTP/1.x, HTTP/2, gRPC are all considered as HTTP requests.
-  // [#next-free-field: 12]
+  // [#next-free-field: 14]
   message HttpRequest {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.service.auth.v2.AttributeContext.HttpRequest";
@@ -144,7 +144,14 @@ message AttributeContext {
     string protocol = 10;
 
     // The HTTP request body.
-    string body = 11;
+    string body = 11 [deprecated = true];
+
+    oneof request_body {
+      // The HTTP request body in bytes.
+      bytes bytes = 12;
+
+      string utf8 = 13;
+    }
   }
 
   // The source of a network activity, such as starting a TCP connection.
