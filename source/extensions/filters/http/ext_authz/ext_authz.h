@@ -18,6 +18,7 @@
 #include "common/common/matchers.h"
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
+#include "common/http/header_utility.h"
 #include "common/runtime/runtime_protos.h"
 
 #include "extensions/filters/common/ext_authz/ext_authz.h"
@@ -60,6 +61,8 @@ public:
         clear_route_cache_(config.clear_route_cache()),
         max_request_bytes_(config.with_request_body().max_request_bytes()),
         pack_as_bytes_(config.with_request_body().pack_as_bytes()),
+        bypass_matchers_(
+            Http::HeaderUtility::buildHeaderMatchers(config.with_request_body().bypass_matchers())),
         status_on_error_(toErrorCode(config.status_on_error().code())), scope_(scope),
         runtime_(runtime), http_context_(http_context),
         filter_enabled_(config.has_filter_enabled()
@@ -93,6 +96,10 @@ public:
   uint32_t maxRequestBytes() const { return max_request_bytes_; }
 
   bool packAsBytes() const { return pack_as_bytes_; }
+
+  const std::vector<Http::HeaderUtility::HeaderData>& bypassMatchers() const {
+    return bypass_matchers_;
+  }
 
   Http::Code statusOnError() const { return status_on_error_; }
 
@@ -148,6 +155,7 @@ private:
   const bool clear_route_cache_;
   const uint32_t max_request_bytes_;
   const bool pack_as_bytes_;
+  const std::vector<Http::HeaderUtility::HeaderData> bypass_matchers_;
   const Http::Code status_on_error_;
   Stats::Scope& scope_;
   Runtime::Loader& runtime_;
@@ -191,6 +199,8 @@ public:
       : context_extensions_(config.has_check_settings()
                                 ? config.check_settings().context_extensions()
                                 : ContextExtensionsMap()),
+        bypass_buffering_request_body_(config.has_check_settings() &&
+                                       config.check_settings().bypass_buffering_request_body()),
         disabled_(config.disabled()) {}
 
   void merge(const FilterConfigPerRoute& other);
@@ -204,10 +214,13 @@ public:
 
   bool disabled() const { return disabled_; }
 
+  bool bypassBufferingRequestBody() const { return bypass_buffering_request_body_; }
+
 private:
   // We save the context extensions as a protobuf map instead of an std::map as this allows us to
   // move it to the CheckRequest, thus avoiding a copy that would incur by converting it.
   ContextExtensionsMap context_extensions_;
+  bool bypass_buffering_request_body_;
   bool disabled_;
 };
 
@@ -242,6 +255,7 @@ private:
   void continueDecoding();
   bool isBufferFull() const;
   bool skipCheckForRoute(const Router::RouteConstSharedPtr& route) const;
+  bool shouldBufferRequestBody(Http::RequestHeaderMap& headers, bool end_stream) const;
 
   // State of this filter's communication with the external authorization service.
   // The filter has either not started calling the external service, in the middle of calling
@@ -269,6 +283,7 @@ private:
   bool buffer_data_{};
   bool skip_check_{false};
   envoy::service::auth::v3::CheckRequest check_request_{};
+  mutable const FilterConfigPerRoute* per_route_config_{nullptr};
 };
 
 } // namespace ExtAuthz
