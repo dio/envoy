@@ -184,6 +184,7 @@ public:
   static ExportedFunctions exportedFunctions() {
     return {{"protocol", static_luaProtocol},
             {"dynamicMetadata", static_luaDynamicMetadata},
+            {"downstreamLocalAddress", static_luaDownstreamLocalAddress},
             {"downstreamSslConnection", static_luaDownstreamSslConnection}};
   }
 
@@ -205,6 +206,12 @@ private:
    * @return SslConnectionWrapper representation of StreamInfo downstream SSL connection.
    */
   DECLARE_LUA_FUNCTION(StreamInfoWrapper, luaDownstreamSslConnection);
+
+  /**
+   * Get current downstream local address
+   * @return string representation of downstream local address.
+   */
+  DECLARE_LUA_FUNCTION(StreamInfoWrapper, luaDownstreamLocalAddress);
 
   // Envoy::Lua::BaseLuaObject
   void onMarkDead() override { dynamic_metadata_wrapper_.reset(); }
