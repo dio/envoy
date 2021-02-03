@@ -361,7 +361,7 @@ private:
 
 using CoroutinePtr = std::unique_ptr<Coroutine>;
 using Initializer = std::function<void(lua_State*)>;
-using InitializerList = std::vector<const Initializer>;
+using InitializerList = std::vector<Initializer>;
 
 /**
  * This class wraps a Lua state that can be used safely across threads. The model is that every
@@ -390,8 +390,7 @@ public:
    * @param initializers supplies a collection of initializers.
    * @return a slot/index for later use with getGlobalRef().
    */
-  uint64_t registerGlobal(const std::string& global,
-                          const std::vector<const Initializer>& initializers);
+  uint64_t registerGlobal(const std::string& global, const InitializerList& initializers);
 
   /**
    * Register a type with the thread local state. After this call the type will be available on
