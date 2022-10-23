@@ -45,7 +45,7 @@ if __name__ == '__main__':
 
     current_version = current_version_file.read_text().rstrip()
 
-    # Exit when we are in a 'main' copy.
+    # Exit when we are in a "main" copy.
     if current_version.endswith('-dev'):
         print(
             'Failed to create SOURCE_VERSION. '
