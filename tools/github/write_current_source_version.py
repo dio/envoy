@@ -58,5 +58,5 @@ if __name__ == '__main__':
                                 + current_version) as response:
         commit_info = json.loads(response.read())
         source_version_file = pathlib.Path('SOURCE_VERSION')
-        # Write the extracted current version commit hash 'sha' to SOURCE_VERSION.
+        # Write the extracted current version commit hash "sha" to SOURCE_VERSION.
         source_version_file.write_text(commit_info['sha'])
