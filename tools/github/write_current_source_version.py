@@ -5,7 +5,7 @@
 # The SOURCE_VERSION file is produced by reading current version tag from VERSION.txt file then
 # fetch the corresponding commit hash from GitHub.
 #
-# Note: This script can only be executed from project root directory of an extracted 'release'
+# Note: This script can only be executed from project root directory of an extracted "release"
 # tarball.
 
 import argparse
