@@ -35,8 +35,11 @@ if __name__ == "__main__":
             sys.exit(0)
         sys.exit(1)
 
+    # Get the project root directory.
+    project_root_dir = pathlib.PurePath(__file__).parent.parent.parent
+
     # Check if we have VERSION.txt available
-    current_version_file = pathlib.Path("VERSION.txt")
+    current_version_file = pathlib.Path(project_root_dir, "VERSION.txt")
     if not current_version_file.exists():
         print(
             "Failed to read VERSION.txt. "
@@ -57,6 +60,6 @@ if __name__ == "__main__":
     with urllib.request.urlopen("https://api.github.com/repos/envoyproxy/envoy/commits/v"
                                 + current_version) as response:
         commit_info = json.loads(response.read())
-        source_version_file = pathlib.Path("SOURCE_VERSION")
+        source_version_file = pathlib.Path(project_root_dir, "SOURCE_VERSION")
         # Write the extracted current version commit hash "sha" to SOURCE_VERSION.
         source_version_file.write_text(commit_info["sha"])
