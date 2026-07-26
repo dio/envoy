@@ -77,6 +77,7 @@ envoy_cc_library(
 go_library(
     name = "go_sdk_shared",
     srcs = [
+        "sdk/go/shared/cluster_api.go",
         "sdk/go/shared/http.go",
         "sdk/go/shared/http_api.go",
         "sdk/go/shared/listener_api.go",
@@ -113,6 +114,7 @@ go_library(
 go_library(
     name = "go_sdk_abi",
     srcs = [
+        "sdk/go/abi/cluster.go",
         "sdk/go/abi/internal.go",
         "sdk/go/abi/listener.go",
         "sdk/go/abi/network.go",

@@ -12,6 +12,7 @@ var httpFilterConfigFactoryRegistry = make(map[string]shared.HttpFilterConfigFac
 var listenerFilterConfigFactoryRegistry = make(map[string]shared.ListenerFilterConfigFactory)
 var networkFilterConfigFactoryRegistry = make(map[string]shared.NetworkFilterConfigFactory)
 var statSinkConfigFactoryRegistry = make(map[string]shared.StatSinkConfigFactory)
+var clusterConfigFactoryRegistry = make(map[string]shared.ClusterConfigFactory)
 
 // NewHttpFilterFactory creates a new plugin factory for the given plugin name and unparsed config.
 func NewHttpFilterFactory(handle shared.HttpFilterConfigHandle, name string,
@@ -117,5 +118,30 @@ func RegisterStatSinkConfigFactories(factories map[string]shared.StatSinkConfigF
 			panic("stat sink config factory already registered: " + name)
 		}
 		statSinkConfigFactoryRegistry[name] = factory
+	}
+}
+
+// NewClusterFactory creates a cluster factory for the given cluster name and unparsed config.
+func NewClusterFactory(name string, unparsedConfig []byte) (shared.ClusterFactory, error) {
+	configFactory := clusterConfigFactoryRegistry[name]
+	if configFactory == nil {
+		return nil, fmt.Errorf("failed to get cluster config factory for %s", name)
+	}
+	return configFactory.Create(unparsedConfig)
+}
+
+// GetClusterConfigFactory gets the cluster config factory for the given cluster name.
+func GetClusterConfigFactory(name string) shared.ClusterConfigFactory {
+	return clusterConfigFactoryRegistry[name]
+}
+
+// RegisterClusterConfigFactories registers cluster config factories for clusters in the composer
+// binary itself. This function MUST only be called from init() functions.
+func RegisterClusterConfigFactories(factories map[string]shared.ClusterConfigFactory) {
+	for name, factory := range factories {
+		if _, ok := clusterConfigFactoryRegistry[name]; ok {
+			panic("cluster config factory already registered: " + name)
+		}
+		clusterConfigFactoryRegistry[name] = factory
 	}
 }

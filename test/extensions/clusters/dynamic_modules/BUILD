@@ -17,6 +17,7 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:cluster_no_op",
         "//test/extensions/dynamic_modules/test_data/c:cluster_run_on_all_workers",
         "//test/extensions/dynamic_modules/test_data/c:no_op",
+        "//test/extensions/dynamic_modules/test_data/go:cluster_integration_test",
     ],
     rbe_pool = "6gig",
     deps = [

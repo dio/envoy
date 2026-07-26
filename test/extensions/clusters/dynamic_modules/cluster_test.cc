@@ -198,6 +198,67 @@ cluster_type:
   EXPECT_NE(nullptr, result->second);
 }
 
+TEST_F(DynamicModuleClusterTest, GoSdkAddsLogicalHostsAndSelectsByHeader) {
+  Server::ServerLifecycleNotifier::StageCallback server_initialized;
+  EXPECT_CALL(server_context_.lifecycle_notifier_,
+              registerCallback(Server::ServerLifecycleNotifier::Stage::PostInit,
+                               testing::An<Server::ServerLifecycleNotifier::StageCallback>()))
+      .WillOnce(testing::DoAll(testing::SaveArg<1>(&server_initialized), Return(nullptr)));
+
+  const std::string yaml = fmt::format(
+      R"EOF(
+name: test_cluster
+connect_timeout: 0.25s
+lb_policy: CLUSTER_PROVIDED
+cluster_type:
+  name: envoy.clusters.dynamic_modules
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_modules.v3.ClusterConfig
+    dynamic_module_config:
+      module:
+        local:
+          filename: {}
+    cluster_name: go_cluster_test
+)EOF",
+      Extensions::DynamicModules::testSharedObjectPath("cluster_integration_test", "go"));
+  auto result = createCluster(yaml);
+  ASSERT_OK(result);
+
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  bool initialized = false;
+  cluster->initialize([&initialized] {
+    initialized = true;
+    return absl::OkStatus();
+  });
+  ASSERT_TRUE(initialized);
+
+  const auto& initial_hosts = cluster->prioritySet().hostSetsPerPriority()[0]->hosts();
+  ASSERT_EQ(1, initial_hosts.size());
+  EXPECT_EQ("service-a.test", initial_hosts[0]->hostname());
+
+  ASSERT_TRUE(server_initialized);
+  server_initialized();
+
+  const auto& initialized_hosts = cluster->prioritySet().hostSetsPerPriority()[0]->hosts();
+  ASSERT_EQ(2, initialized_hosts.size());
+  EXPECT_EQ("service-a.test", initialized_hosts[0]->hostname());
+  EXPECT_EQ("service-b.test", initialized_hosts[1]->hostname());
+
+  auto& thread_aware_lb = result->second;
+  ASSERT_OK(thread_aware_lb->initialize());
+  auto lb = thread_aware_lb->factory()->create({cluster->prioritySet()});
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "GET"}, {"x-target-host", "service-b.test"}};
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  ON_CALL(context, downstreamHeaders()).WillByDefault(Return(&headers));
+
+  auto response = lb->chooseHost(&context);
+  ASSERT_NE(nullptr, response.host);
+  EXPECT_EQ("service-b.test", response.host->hostname());
+}
+
 // Test that creating a cluster with cluster_config succeeds.
 TEST_F(DynamicModuleClusterTest, CreationWithClusterConfig) {
   auto result =
