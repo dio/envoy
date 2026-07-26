@@ -9802,6 +9802,37 @@ bool envoy_dynamic_module_callback_cluster_add_hosts(
     size_t count, envoy_dynamic_module_type_cluster_host_envoy_ptr* result_host_ptrs);
 
 /**
+ * envoy_dynamic_module_callback_cluster_add_hosts_with_hostnames is equivalent to
+ * envoy_dynamic_module_callback_cluster_add_hosts, but additionally assigns each host a logical
+ * hostname.
+ *
+ * A non-empty logical hostname is available to upstream features such as automatic SNI and SAN
+ * validation. An empty hostname entry preserves the legacy synthesized hostname behavior.
+ *
+ * When ``hostnames`` is non-null, Envoy creates one independently owned host for every input,
+ * including when multiple inputs or existing hosts share the same address. The module must retain
+ * the returned host pointer for selection and removal. Logical deduplication is the module's
+ * responsibility because only the module has a stable endpoint identity.
+ *
+ * @param hostnames is the optional array of logical hostnames corresponding to ``addresses``. Each
+ * entry is owned by the module. An entry with length 0 uses the legacy synthesized hostname. The
+ * entire array can be nullptr to use the legacy behavior, including address-based deduplication,
+ * for all hosts.
+ *
+ * See envoy_dynamic_module_callback_cluster_add_hosts for all other parameters and return
+ * semantics.
+ */
+bool envoy_dynamic_module_callback_cluster_add_hosts_with_hostnames(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr, uint32_t priority,
+    const envoy_dynamic_module_type_module_buffer* addresses,
+    const envoy_dynamic_module_type_module_buffer* hostnames, const uint32_t* weights,
+    const envoy_dynamic_module_type_module_buffer* regions,
+    const envoy_dynamic_module_type_module_buffer* zones,
+    const envoy_dynamic_module_type_module_buffer* sub_zones,
+    const envoy_dynamic_module_type_module_buffer* metadata_pairs, size_t metadata_pairs_per_host,
+    size_t count, envoy_dynamic_module_type_cluster_host_envoy_ptr* result_host_ptrs);
+
+/**
  * envoy_dynamic_module_callback_cluster_remove_hosts removes multiple hosts from the cluster in a
  * single batch operation. This triggers only one priority set update regardless of how many hosts
  * are removed.
@@ -9844,6 +9875,10 @@ bool envoy_dynamic_module_callback_cluster_update_host_health(
  * address using the cross-priority host map.
  *
  * The address string must match the format ``ip:port`` (e.g., ``10.0.0.1:8080``).
+ *
+ * This callback is not suitable for distinguishing hosts that share an address. Modules using
+ * envoy_dynamic_module_callback_cluster_add_hosts_with_hostnames must retain the returned host
+ * pointers when exact host identity is required.
  *
  * This is optional. Only modules that need to resolve addresses to host pointers need to use this.
  *
@@ -10006,6 +10041,10 @@ bool envoy_dynamic_module_callback_cluster_lb_get_host_health_by_address(
  * worker threads during load balancing decisions.
  *
  * The address string must match the format ``ip:port`` (e.g., ``10.0.0.1:8080``).
+ *
+ * This callback is not suitable for distinguishing hosts that share an address. Modules using
+ * envoy_dynamic_module_callback_cluster_add_hosts_with_hostnames must retain the returned host
+ * pointers when exact host identity is required.
  *
  * This is optional. Only modules that need to resolve addresses to host pointers during load
  * balancing need to use this.
