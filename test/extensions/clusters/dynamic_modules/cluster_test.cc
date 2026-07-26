@@ -619,7 +619,7 @@ TEST_F(DynamicModuleClusterTest, AddHostsWithHostnamesABI) {
   EXPECT_EQ("test_cluster127.0.0.1:10002", hosts[1]->hostname());
 }
 
-TEST_F(DynamicModuleClusterTest, AddHostsWithHostnamesDeduplicatesIncrementalSharedAddress) {
+TEST_F(DynamicModuleClusterTest, AddHostsWithHostnamesAllowsIncrementalSharedAddress) {
   auto result = createCluster(makeYamlConfig("cluster_no_op"));
   ASSERT_OK(result);
 
@@ -641,12 +641,18 @@ TEST_F(DynamicModuleClusterTest, AddHostsWithHostnamesDeduplicatesIncrementalSha
   ASSERT_TRUE(envoy_dynamic_module_callback_cluster_add_hosts_with_hostnames(
       cluster.get(), 0, &address, &hostnames[1], &weight, &empty_locality, &empty_locality,
       &empty_locality, nullptr, 0, 1, &host_ptrs[1]));
-  EXPECT_EQ(nullptr, host_ptrs[1]);
+  ASSERT_NE(nullptr, host_ptrs[1]);
+  EXPECT_NE(host_ptrs[0], host_ptrs[1]);
 
   const auto& hosts = cluster->prioritySet().hostSetsPerPriority()[0]->hosts();
-  ASSERT_EQ(1, hosts.size());
+  ASSERT_EQ(2, hosts.size());
   EXPECT_EQ("service-a.test", hosts[0]->hostname());
+  EXPECT_EQ("service-b.test", hosts[1]->hostname());
+
   EXPECT_EQ(1, envoy_dynamic_module_callback_cluster_remove_hosts(cluster.get(), &host_ptrs[0], 1));
+  ASSERT_EQ(1, cluster->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ(host_ptrs[1], cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0].get());
+  EXPECT_EQ(1, envoy_dynamic_module_callback_cluster_remove_hosts(cluster.get(), &host_ptrs[1], 1));
 }
 
 TEST_F(DynamicModuleClusterTest, AddHostsWithNullHostnamesABIUsesLegacyHostname) {

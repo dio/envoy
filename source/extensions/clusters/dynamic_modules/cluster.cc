@@ -432,8 +432,12 @@ bool DynamicModuleCluster::addHosts(
       return false;
     }
 
-    // Skip addresses already in the host set. This does not deduplicate within the batch.
-    if (existing_hosts != nullptr && existing_hosts->contains(resolved_address->asString())) {
+    // Preserve address-based deduplication for the legacy callback. Once the module supplies
+    // logical hostnames, the returned HostPtr is the host identity: two logical hosts may share an
+    // address, and replacements may retain both address and hostname while changing other
+    // attributes.
+    if (hostnames.empty() && existing_hosts != nullptr &&
+        existing_hosts->contains(resolved_address->asString())) {
       continue;
     }
 
