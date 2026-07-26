@@ -3,6 +3,7 @@ package abi
 /*
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include "../../../abi/abi.h"
 
 static inline void* envoy_dynamic_module_go_handle_to_pointer(uintptr_t handle) {
@@ -62,6 +63,26 @@ func removeClusterHandle(pointer unsafe.Pointer) {
 	handle.Delete()
 }
 
+func allocateClusterSlice[T any](count int) ([]T, unsafe.Pointer) {
+	var value T
+	allocation := C.malloc(C.size_t(count) * C.size_t(unsafe.Sizeof(value)))
+	if allocation == nil {
+		return nil, nil
+	}
+	return unsafe.Slice((*T)(allocation), count), allocation
+}
+
+func copyClusterString(value string) (C.envoy_dynamic_module_type_module_buffer, unsafe.Pointer) {
+	if len(value) == 0 {
+		return C.envoy_dynamic_module_type_module_buffer{}, nil
+	}
+	allocation := C.CBytes([]byte(value))
+	return C.envoy_dynamic_module_type_module_buffer{
+		ptr:    (*C.char)(allocation),
+		length: C.size_t(len(value)),
+	}, allocation
+}
+
 func (h *dymClusterHandle) AddHosts(
 	specs []shared.ClusterHostSpec,
 ) ([]shared.ClusterHostHandle, bool) {
@@ -69,19 +90,49 @@ func (h *dymClusterHandle) AddHosts(
 		return []shared.ClusterHostHandle{}, true
 	}
 
-	addressStrings := make([]string, len(specs))
-	hostnameStrings := make([]string, len(specs))
-	addresses := make([]C.envoy_dynamic_module_type_module_buffer, len(specs))
-	hostnames := make([]C.envoy_dynamic_module_type_module_buffer, len(specs))
-	weights := make([]C.uint32_t, len(specs))
-	localities := make([]C.envoy_dynamic_module_type_module_buffer, len(specs))
-	results := make([]C.envoy_dynamic_module_type_cluster_host_envoy_ptr, len(specs))
+	addresses, addressesAllocation := allocateClusterSlice[C.envoy_dynamic_module_type_module_buffer](len(specs))
+	hostnames, hostnamesAllocation := allocateClusterSlice[C.envoy_dynamic_module_type_module_buffer](len(specs))
+	weights, weightsAllocation := allocateClusterSlice[C.uint32_t](len(specs))
+	localities, localitiesAllocation := allocateClusterSlice[C.envoy_dynamic_module_type_module_buffer](len(specs))
+	results, resultsAllocation := allocateClusterSlice[C.envoy_dynamic_module_type_cluster_host_envoy_ptr](len(specs))
+	allocations := []unsafe.Pointer{
+		addressesAllocation,
+		hostnamesAllocation,
+		weightsAllocation,
+		localitiesAllocation,
+		resultsAllocation,
+	}
+	for _, allocation := range allocations {
+		if allocation == nil {
+			for _, allocation := range allocations {
+				C.free(allocation)
+			}
+			return []shared.ClusterHostHandle{}, false
+		}
+	}
+	defer func() {
+		for _, allocation := range allocations {
+			C.free(allocation)
+		}
+	}()
+	clear(localities)
+	clear(results)
 
+	stringAllocations := make([]unsafe.Pointer, 0, 2*len(specs))
+	defer func() {
+		for _, allocation := range stringAllocations {
+			C.free(allocation)
+		}
+	}()
 	for i, spec := range specs {
-		addressStrings[i] = spec.Address
-		hostnameStrings[i] = spec.Hostname
-		addresses[i] = stringToModuleBuffer(addressStrings[i])
-		hostnames[i] = stringToModuleBuffer(hostnameStrings[i])
+		var addressAllocation, hostnameAllocation unsafe.Pointer
+		addresses[i], addressAllocation = copyClusterString(spec.Address)
+		hostnames[i], hostnameAllocation = copyClusterString(spec.Hostname)
+		stringAllocations = append(stringAllocations, addressAllocation, hostnameAllocation)
+		if (len(spec.Address) > 0 && addressAllocation == nil) ||
+			(len(spec.Hostname) > 0 && hostnameAllocation == nil) {
+			return []shared.ClusterHostHandle{}, false
+		}
 		weights[i] = C.uint32_t(spec.Weight)
 	}
 
@@ -99,13 +150,6 @@ func (h *dymClusterHandle) AddHosts(
 		C.size_t(len(specs)),
 		unsafe.SliceData(results),
 	)
-	runtime.KeepAlive(specs)
-	runtime.KeepAlive(addressStrings)
-	runtime.KeepAlive(hostnameStrings)
-	runtime.KeepAlive(addresses)
-	runtime.KeepAlive(hostnames)
-	runtime.KeepAlive(weights)
-	runtime.KeepAlive(localities)
 	if !bool(ok) {
 		return []shared.ClusterHostHandle{}, false
 	}
