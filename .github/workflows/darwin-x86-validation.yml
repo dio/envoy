@@ -13,6 +13,8 @@ jobs:
     name: macOS Intel build
     runs-on: macos-15-intel
     timeout-minutes: 120
+    env:
+      BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
     steps:
     - name: Check out draft SHA
       uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
@@ -30,9 +32,14 @@ jobs:
           --curses=no
           --verbose_failures
           "--override_repository=envoy_build_config=${build_config}"
+          --remote_cache=grpcs://remote.buildbuddy.io
+          "--remote_header=x-buildbuddy-api-key=${BUILDBUDDY_API_KEY}"
+          --remote_cache_compression
+          --remote_timeout=120
+          --remote_upload_local_results
           --platforms=//bazel/platforms:macos_x86_64
-          # The hosted Intel image exposes Homebrew OpenSSL headers as non-system headers.
-          --copt=-Wno-error=old-style-cast
+          # Prefer Envoy's BoringSSL headers over Homebrew OpenSSL on the hosted Intel image.
+          --copt=-Iexternal/boringssl/include
         )
 
         selected_protoc="$({
