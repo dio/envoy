@@ -31,6 +31,8 @@ jobs:
           --verbose_failures
           "--override_repository=envoy_build_config=${build_config}"
           --platforms=//bazel/platforms:macos_x86_64
+          # The hosted Intel image exposes Homebrew OpenSSL headers as non-system headers.
+          --copt=-Wno-error=old-style-cast
         )
 
         selected_protoc="$({
