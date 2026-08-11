@@ -27,6 +27,11 @@ jobs:
         test "$(uname -m)" = "x86_64"
         uname -a
 
+        # The hosted Intel image places Homebrew OpenSSL ahead of declared Bazel headers.
+        if [[ -d /usr/local/include/openssl ]]; then
+          sudo mv /usr/local/include/openssl /usr/local/include/openssl.envoy-validation-backup
+        fi
+
         build_config="$(pwd)/ci/osx-build-config"
         common_options=(
           --curses=no
