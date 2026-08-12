@@ -59,33 +59,54 @@ jobs:
           --remote_cache_compression
           --remote_timeout=120
           --remote_upload_local_results
-          "--platforms=${{ matrix.platform }}"
           # Prefer Envoy's BoringSSL headers over Homebrew OpenSSL on the hosted Intel image.
           --copt=-Iexternal/boringssl/include
         )
+        platform_options=(
+          "${common_options[@]}"
+          "--platforms=${{ matrix.platform }}"
+        )
 
         selected_protoc="$({
-          bazel cquery "${common_options[@]}" \
+          bazel cquery "${platform_options[@]}" \
             //tools/protoc:protoc \
             --output=build
         })"
         grep -F '${{ matrix.expected_protoc }}' <<< "${selected_protoc}"
 
         selected_protoc_with_cpu="$({
-          bazel cquery "${common_options[@]}" \
+          bazel cquery "${platform_options[@]}" \
             --cpu=k8 \
             //tools/protoc:protoc \
             --output=build
         })"
         grep -F '${{ matrix.expected_protoc }}' <<< "${selected_protoc_with_cpu}"
 
-        bazel build "${common_options[@]}" \
+        bazel build "${platform_options[@]}" \
           //tools/protoc:protoc \
           //source/extensions/network/dns_resolver/apple:config \
           //source/extensions/geoip_providers/maxmind:config
 
-        bazel build "${common_options[@]}" \
+        bazel build "${platform_options[@]}" \
           --cpu=k8 \
+          //tools/protoc:protoc \
+          //source/extensions/network/dns_resolver/apple:config \
+          //source/extensions/geoip_providers/maxmind:config
+
+        # Homebrew Core builds Envoy with --config=macos and no explicit target platform.
+        homebrew_options=(
+          "${common_options[@]}"
+          --config=macos
+        )
+
+        selected_protoc_homebrew="$({
+          bazel cquery "${homebrew_options[@]}" \
+            //tools/protoc:protoc \
+            --output=build
+        })"
+        grep -F '${{ matrix.expected_protoc }}' <<< "${selected_protoc_homebrew}"
+
+        bazel build "${homebrew_options[@]}" \
           //tools/protoc:protoc \
           //source/extensions/network/dns_resolver/apple:config \
           //source/extensions/geoip_providers/maxmind:config
