@@ -363,6 +363,18 @@ pub trait HttpFilter<EHF: EnvoyHttpFilter> {
 /// An opaque object that represents the underlying Envoy Http filter config. This has one to one
 /// mapping with the Envoy Http filter config object as well as [`HttpFilterConfig`] object.
 pub trait EnvoyHttpFilterConfig {
+  /// Read a bounded batch from one runtime snapshot during the current owning Envoy hook.
+  /// Returned values are copied. For BufferTooSmall, resize scratch and retry the entire batch.
+  /// Do not call from a module-created thread. An unchanged revision is not proof of freshness.
+  fn runtime_read_batch<'a>(
+    &self,
+    _requests: &[crate::runtime::RuntimeRequest<'a>],
+    _condition: Option<crate::runtime::RuntimeCondition<'a>>,
+    _scratch: &mut [u8],
+  ) -> Result<crate::runtime::RuntimeBatch, crate::runtime::RuntimeReadError> {
+    Err(crate::runtime::RuntimeReadError::Unsupported)
+  }
+
   /// Define a new counter scoped to this filter config with the given name.
   fn define_counter(
     &mut self,
@@ -574,6 +586,23 @@ pub struct EnvoyHttpFilterConfigImpl {
 }
 
 impl EnvoyHttpFilterConfig for EnvoyHttpFilterConfigImpl {
+  fn runtime_read_batch<'a>(
+    &self,
+    requests: &[crate::runtime::RuntimeRequest<'a>],
+    condition: Option<crate::runtime::RuntimeCondition<'a>>,
+    scratch: &mut [u8],
+  ) -> Result<crate::runtime::RuntimeBatch, crate::runtime::RuntimeReadError> {
+    unsafe {
+      crate::runtime::read_batch(
+        self.raw_ptr,
+        abi::envoy_dynamic_module_callback_http_filter_config_runtime_read_batch,
+        requests,
+        condition,
+        scratch,
+      )
+    }
+  }
+
   fn define_counter(
     &mut self,
     name: &str,
@@ -1035,6 +1064,18 @@ impl EnvoyHttpFilterConfig for EnvoyHttpFilterConfigImpl {
 #[automock]
 #[allow(clippy::needless_lifetimes)] // Explicit lifetime specifiers are needed for mockall.
 pub trait EnvoyHttpFilter {
+  /// Read a bounded batch from one runtime snapshot during the current owning Envoy hook.
+  /// Returned values are copied. For BufferTooSmall, resize scratch and retry the entire batch.
+  /// Do not call from a module-created thread. An unchanged revision is not proof of freshness.
+  fn runtime_read_batch<'a>(
+    &self,
+    _requests: &[crate::runtime::RuntimeRequest<'a>],
+    _condition: Option<crate::runtime::RuntimeCondition<'a>>,
+    _scratch: &mut [u8],
+  ) -> Result<crate::runtime::RuntimeBatch, crate::runtime::RuntimeReadError> {
+    Err(crate::runtime::RuntimeReadError::Unsupported)
+  }
+
   /// Get the value of the request header with the given key.
   /// If the header is not found, this returns `None`.
   ///
@@ -2480,6 +2521,23 @@ pub struct EnvoyHttpFilterImpl {
 }
 
 impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
+  fn runtime_read_batch<'a>(
+    &self,
+    requests: &[crate::runtime::RuntimeRequest<'a>],
+    condition: Option<crate::runtime::RuntimeCondition<'a>>,
+    scratch: &mut [u8],
+  ) -> Result<crate::runtime::RuntimeBatch, crate::runtime::RuntimeReadError> {
+    unsafe {
+      crate::runtime::read_batch(
+        self.raw_ptr,
+        abi::envoy_dynamic_module_callback_http_filter_runtime_read_batch,
+        requests,
+        condition,
+        scratch,
+      )
+    }
+  }
+
   fn get_request_header_value(&self, key: &str) -> Option<EnvoyBuffer<'_>> {
     self.get_header_value_impl(
       key,

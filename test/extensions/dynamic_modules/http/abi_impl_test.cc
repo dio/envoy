@@ -20,6 +20,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/router/mocks.h"
+#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
@@ -2999,6 +3000,41 @@ TEST_F(ABIImplGenericSecretTest, ReadUnknownId) {
   // 0 is never a valid ID, and IDs past the end are unknown.
   EXPECT_EQ(getSecret(0), std::nullopt);
   EXPECT_EQ(getSecret(id + 1), std::nullopt);
+}
+
+TEST(ABIImpl, RuntimeBatchFromRequestAndConfig) {
+  Stats::TestUtil::TestStore store;
+  Stats::TestUtil::TestScope scope{"", store};
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  auto config = std::make_shared<DynamicModuleHttpFilterConfig>(
+      "runtime", "", DefaultMetricsNamespace, nullptr, scope, context);
+  DynamicModuleHttpFilter filter{config, scope.symbolTable(), 0};
+  auto snapshot = std::make_shared<testing::StrictMock<Runtime::MockSnapshot>>();
+  const std::string text = "copied";
+  EXPECT_CALL(*snapshot, get("key")).Times(2).WillRepeatedly(testing::Return(std::cref(text)));
+  EXPECT_CALL(context.runtime_loader_, threadsafeSnapshot())
+      .Times(2)
+      .WillRepeatedly(testing::Return(snapshot));
+  envoy_dynamic_module_type_runtime_request request{
+      {"key", 3}, envoy_dynamic_module_type_runtime_value_kind_String, false, 0, 0};
+  envoy_dynamic_module_type_runtime_value value{};
+  char bytes[16];
+  size_t size = 0;
+  EXPECT_EQ(envoy_dynamic_module_type_runtime_read_result_Ok,
+            envoy_dynamic_module_callback_http_filter_config_runtime_read_batch(
+                config.get(), &request, 1, nullptr, &value, bytes, sizeof(bytes), &size));
+  EXPECT_EQ("copied", std::string(bytes, size));
+  EXPECT_EQ(envoy_dynamic_module_type_runtime_read_result_Ok,
+            envoy_dynamic_module_callback_http_filter_runtime_read_batch(
+                &filter, &request, 1, nullptr, &value, bytes, sizeof(bytes), &size));
+  EXPECT_EQ("copied", std::string(bytes, size));
+  EXPECT_EQ(envoy_dynamic_module_type_runtime_read_result_InvalidArgument,
+            envoy_dynamic_module_callback_http_filter_runtime_read_batch(
+                nullptr, &request, 1, nullptr, &value, bytes, sizeof(bytes), &size));
+  EXPECT_EQ(0, size);
+  EXPECT_EQ(envoy_dynamic_module_type_runtime_read_result_InvalidArgument,
+            envoy_dynamic_module_callback_http_filter_config_runtime_read_batch(
+                nullptr, &request, 1, nullptr, &value, bytes, sizeof(bytes), nullptr));
 }
 
 TEST(ABIImpl, Stats) {

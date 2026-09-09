@@ -16,6 +16,7 @@
 #include "test/extensions/dynamic_modules/util.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/connection.h"
+#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
@@ -167,6 +168,38 @@ bool addSimpleHosts(DynamicModuleCluster& cluster, const std::vector<std::string
 // Test that creating a cluster with a valid no-op module succeeds.
 // Pull the shared dynamic-modules test helper into scope.
 using ::Envoy::Extensions::DynamicModules::failureCounter;
+
+TEST_F(DynamicModuleClusterTest, RuntimeBatchFromClusterAndWorker) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_OK(result);
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  NiceMock<Upstream::MockPrioritySet> worker_ps;
+  auto handle = std::make_shared<DynamicModuleClusterHandle>(cluster);
+  auto lb = std::make_unique<DynamicModuleLoadBalancer>(handle, worker_ps);
+  auto snapshot = std::make_shared<testing::StrictMock<Runtime::MockSnapshot>>();
+  EXPECT_CALL(*snapshot, getBoolean("enabled", false)).Times(2).WillRepeatedly(Return(true));
+  EXPECT_CALL(server_context_.runtime_loader_, threadsafeSnapshot())
+      .Times(2)
+      .WillRepeatedly(Return(snapshot));
+  envoy_dynamic_module_type_runtime_request request{
+      {"enabled", 7}, envoy_dynamic_module_type_runtime_value_kind_Boolean, false, 0, 0};
+  envoy_dynamic_module_type_runtime_value value{};
+  size_t size = 0;
+  EXPECT_EQ(envoy_dynamic_module_type_runtime_read_result_Ok,
+            envoy_dynamic_module_callback_cluster_runtime_read_batch(
+                cluster.get(), &request, 1, nullptr, &value, nullptr, 0, &size));
+  EXPECT_TRUE(value.boolean_value);
+  EXPECT_EQ(envoy_dynamic_module_type_runtime_read_result_Ok,
+            envoy_dynamic_module_callback_cluster_lb_runtime_read_batch(
+                lb.get(), &request, 1, nullptr, &value, nullptr, 0, &size));
+  EXPECT_TRUE(value.boolean_value);
+  EXPECT_EQ(envoy_dynamic_module_type_runtime_read_result_InvalidArgument,
+            envoy_dynamic_module_callback_cluster_runtime_read_batch(nullptr, &request, 1, nullptr,
+                                                                     &value, nullptr, 0, &size));
+  EXPECT_EQ(envoy_dynamic_module_type_runtime_read_result_InvalidArgument,
+            envoy_dynamic_module_callback_cluster_lb_runtime_read_batch(
+                nullptr, &request, 1, nullptr, &value, nullptr, 0, nullptr));
+}
 
 TEST_F(DynamicModuleClusterTest, BasicCreation) {
   auto result = createCluster(makeYamlConfig("cluster_no_op"));

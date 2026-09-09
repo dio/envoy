@@ -26,6 +26,7 @@ pub mod load_balancer;
 pub mod matcher;
 pub mod matcher_data_input;
 pub mod network;
+pub mod runtime;
 pub mod stats_sink;
 pub mod tracer;
 pub mod transport_socket;

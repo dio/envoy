@@ -345,6 +345,8 @@ public:
 
 #undef ID_TO_INDEX
 
+  Runtime::Loader& runtime() const { return server_context_.runtime(); }
+
   /**
    * Subscribes to a generic secret so that the module can read its value by the returned ID.
    *

@@ -39,50 +39,6 @@ type httpFilterSharedDataWrapper struct {
 	data any
 }
 
-const numManagerShards = 32
-
-// The managers to keep track of configs and plugins.
-type manager[T any] struct {
-	data  [numManagerShards]map[uintptr]*T
-	mutex [numManagerShards]sync.Mutex
-}
-
-func (m *manager[T]) record(item *T) unsafe.Pointer {
-	pointer := unsafe.Pointer(item)
-	index := uintptr(pointer) % numManagerShards
-	m.mutex[index].Lock()
-	defer m.mutex[index].Unlock()
-	// Assume the map is initialized.
-	m.data[index][uintptr(pointer)] = item
-	return pointer
-}
-
-func (m *manager[T]) unwrap(itemPtr unsafe.Pointer) *T {
-	return (*T)(itemPtr)
-}
-
-func (m *manager[T]) search(key uintptr) *T {
-	index := key % numManagerShards
-	m.mutex[index].Lock()
-	defer m.mutex[index].Unlock()
-	return m.data[index][key]
-}
-
-func (m *manager[T]) remove(itemPtr unsafe.Pointer) {
-	index := uintptr(itemPtr) % numManagerShards
-	m.mutex[index].Lock()
-	defer m.mutex[index].Unlock()
-	delete(m.data[index], uintptr(itemPtr))
-}
-
-func newManager[T any]() *manager[T] {
-	m := &manager[T]{}
-	for i := 0; i < numManagerShards; i++ {
-		m.data[i] = make(map[uintptr]*T)
-	}
-	return m
-}
-
 var configManager = newManager[httpFilterConfigWrapper]()
 var configPerRouteManager = newManager[httpFilterConfigWrapperPerRoute]()
 var pluginManager = newManager[httpFilterWrapper]()

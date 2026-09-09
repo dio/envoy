@@ -377,6 +377,18 @@ pub trait ClusterLbContext {
 /// Envoy-side cluster operations available to the module.
 #[automock]
 pub trait EnvoyCluster: Send + Sync {
+  /// Read a bounded batch from one runtime snapshot during the current owning Envoy hook.
+  /// Returned values are copied. For BufferTooSmall, resize scratch and retry the entire batch.
+  /// Do not call from a module-created thread. An unchanged revision is not proof of freshness.
+  fn runtime_read_batch<'a>(
+    &self,
+    _requests: &[crate::runtime::RuntimeRequest<'a>],
+    _condition: Option<crate::runtime::RuntimeCondition<'a>>,
+    _scratch: &mut [u8],
+  ) -> Result<crate::runtime::RuntimeBatch, crate::runtime::RuntimeReadError> {
+    Err(crate::runtime::RuntimeReadError::Unsupported)
+  }
+
   /// Add multiple hosts to the cluster in a single batch operation.
   ///
   /// Each address must be in `ip:port` format (e.g., `127.0.0.1:8080`).
@@ -610,6 +622,18 @@ impl<C: EnvoyCluster + ?Sized> EnvoyClusterWorkerSlotExt for C {
 /// cluster's priority set.
 #[automock]
 pub trait EnvoyClusterLoadBalancer: Send {
+  /// Read a bounded batch from one runtime snapshot during the current owning Envoy hook.
+  /// Returned values are copied. For BufferTooSmall, resize scratch and retry the entire batch.
+  /// Do not call from a module-created thread. An unchanged revision is not proof of freshness.
+  fn runtime_read_batch<'a>(
+    &self,
+    _requests: &[crate::runtime::RuntimeRequest<'a>],
+    _condition: Option<crate::runtime::RuntimeCondition<'a>>,
+    _scratch: &mut [u8],
+  ) -> Result<crate::runtime::RuntimeBatch, crate::runtime::RuntimeReadError> {
+    Err(crate::runtime::RuntimeReadError::Unsupported)
+  }
+
   /// Get the number of healthy hosts at the given priority level.
   fn get_healthy_host_count(&self, priority: u32) -> usize;
 
@@ -1235,6 +1259,23 @@ impl EnvoyClusterImpl {
 }
 
 impl EnvoyCluster for EnvoyClusterImpl {
+  fn runtime_read_batch<'a>(
+    &self,
+    requests: &[crate::runtime::RuntimeRequest<'a>],
+    condition: Option<crate::runtime::RuntimeCondition<'a>>,
+    scratch: &mut [u8],
+  ) -> Result<crate::runtime::RuntimeBatch, crate::runtime::RuntimeReadError> {
+    unsafe {
+      crate::runtime::read_batch(
+        self.raw,
+        abi::envoy_dynamic_module_callback_cluster_runtime_read_batch,
+        requests,
+        condition,
+        scratch,
+      )
+    }
+  }
+
   fn add_hosts(
     &self,
     addresses: &[String],
@@ -1451,6 +1492,23 @@ impl EnvoyClusterLoadBalancerImpl {
 }
 
 impl EnvoyClusterLoadBalancer for EnvoyClusterLoadBalancerImpl {
+  fn runtime_read_batch<'a>(
+    &self,
+    requests: &[crate::runtime::RuntimeRequest<'a>],
+    condition: Option<crate::runtime::RuntimeCondition<'a>>,
+    scratch: &mut [u8],
+  ) -> Result<crate::runtime::RuntimeBatch, crate::runtime::RuntimeReadError> {
+    unsafe {
+      crate::runtime::read_batch(
+        self.raw,
+        abi::envoy_dynamic_module_callback_cluster_lb_runtime_read_batch,
+        requests,
+        condition,
+        scratch,
+      )
+    }
+  }
+
   fn get_healthy_host_count(&self, priority: u32) -> usize {
     unsafe {
       abi::envoy_dynamic_module_callback_cluster_lb_get_healthy_host_count(self.raw, priority)

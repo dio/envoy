@@ -473,6 +473,64 @@ envoy_dynamic_module_type_abi_version_module_ptr envoy_dynamic_module_on_program
 
 // --------------------------------- Logging -----------------------------------
 
+/** Maximum work and storage accepted by a runtime batch read. */
+#define ENVOY_DYNAMIC_MODULE_RUNTIME_MAX_KEYS 64
+#define ENVOY_DYNAMIC_MODULE_RUNTIME_MAX_INPUT_BYTES 16384
+#define ENVOY_DYNAMIC_MODULE_RUNTIME_MAX_OUTPUT_BYTES 4194304
+
+/** The requested native runtime getter. Numeric/boolean getters use the supplied fallback. */
+typedef enum envoy_dynamic_module_type_runtime_value_kind {
+  envoy_dynamic_module_type_runtime_value_kind_Boolean,
+  envoy_dynamic_module_type_runtime_value_kind_Integer,
+  envoy_dynamic_module_type_runtime_value_kind_Double,
+  envoy_dynamic_module_type_runtime_value_kind_String,
+} envoy_dynamic_module_type_runtime_value_kind;
+
+/** A request owned by the module. Key bytes must remain valid until the callback returns. */
+typedef struct envoy_dynamic_module_type_runtime_request {
+  envoy_dynamic_module_type_module_buffer key;
+  envoy_dynamic_module_type_runtime_value_kind kind;
+  bool fallback_boolean;
+  uint64_t fallback_integer;
+  double fallback_double;
+} envoy_dynamic_module_type_runtime_request;
+
+/**
+ * Optional application change condition, owned by the module for the duration of the call.
+ * A present string value equal to expected returns Unchanged without copying the batch. A missing
+ * key never matches. Pass nullptr for an unconditional read, including the first read.
+ * The application must change this value whenever any requested data changes, including removal.
+ * RTDS and runtime layer merging do not enforce that invariant. This is not a freshness check.
+ */
+typedef struct envoy_dynamic_module_type_runtime_condition {
+  envoy_dynamic_module_type_module_buffer key;
+  envoy_dynamic_module_type_module_buffer expected;
+} envoy_dynamic_module_type_runtime_condition;
+
+/**
+ * One result, owned by the module. Only the field for the requested kind is meaningful.
+ * String bytes are copied into the caller's arena at string_offset for string_length bytes.
+ * string_present distinguishes an empty string from a missing key. No Envoy pointers escape.
+ */
+typedef struct envoy_dynamic_module_type_runtime_value {
+  bool boolean_value;
+  uint64_t integer_value;
+  double double_value;
+  bool string_present;
+  size_t string_offset;
+  size_t string_length;
+} envoy_dynamic_module_type_runtime_value;
+
+/** Whole-call status. Value outputs are valid only on Ok. */
+typedef enum envoy_dynamic_module_type_runtime_read_result {
+  envoy_dynamic_module_type_runtime_read_result_Ok,
+  envoy_dynamic_module_type_runtime_read_result_Unchanged,
+  envoy_dynamic_module_type_runtime_read_result_BufferTooSmall,
+  envoy_dynamic_module_type_runtime_read_result_LimitExceeded,
+  envoy_dynamic_module_type_runtime_read_result_InvalidArgument,
+  envoy_dynamic_module_type_runtime_read_result_Unavailable,
+} envoy_dynamic_module_type_runtime_read_result;
+
 /**
  * envoy_dynamic_module_callback_log is called by the module to log a message as part
  * of the standard Envoy logging stream under [dynamic_modules] Id.
@@ -15648,6 +15706,126 @@ envoy_dynamic_module_callback_cluster_specifier_config_record_histogram_value(
     envoy_dynamic_module_type_cluster_specifier_config_envoy_ptr config_envoy_ptr, size_t id,
     envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
     uint64_t value);
+
+/**
+ * Read requested values from one retained, merged runtime snapshot during the current HTTP worker
+ * hook. Never call using a cached host pointer from a module-created thread or after host
+ * destruction. This reads local state only. It neither waits for RTDS nor registers update
+ * notifications. Inputs, result slots, and the output byte arena must not overlap. All memory is
+ * module-owned. Numeric and boolean reads use native fallback semantics. Non-boolean
+ * runtime-feature reads are invalid. A boolean fallback is not automatically the compiled
+ * runtime-feature default.
+ *
+ * @param context is a live http_filter Envoy handle for the current hook.
+ * @param requests is an array of requests, valid for the duration of this call.
+ * @param requests_size is the request/result count, at most RUNTIME_MAX_KEYS above.
+ * @param condition is an optional application revision comparison, or nullptr.
+ * @param values is an array with requests_size writable entries; nullptr is valid for zero entries.
+ * @param strings is writable storage for copied strings, or nullptr when strings_capacity is zero.
+ * @param strings_capacity is the arena capacity, at most RUNTIME_MAX_OUTPUT_BYTES above.
+ * @param strings_size_out must be non-null. Receives bytes used on Ok or required on
+ * BufferTooSmall; zero on other results. All other outputs must be discarded unless the result is
+ * Ok.
+ * @return status for the complete batch. A BufferTooSmall retry must repeat the entire batch,
+ *         including its condition; the retry can observe a newer snapshot. Bound retries.
+ */
+envoy_dynamic_module_type_runtime_read_result
+envoy_dynamic_module_callback_http_filter_runtime_read_batch(
+    envoy_dynamic_module_type_http_filter_envoy_ptr context,
+    const envoy_dynamic_module_type_runtime_request* requests, size_t requests_size,
+    const envoy_dynamic_module_type_runtime_condition* condition,
+    envoy_dynamic_module_type_runtime_value* values, char* strings, size_t strings_capacity,
+    size_t* strings_size_out);
+
+/**
+ * Read requested values from one retained, merged runtime snapshot during config construction or a
+ * main-thread config-scheduled hook. Never call using a cached host pointer from a module-created
+ * thread or after host destruction. This reads local state only. It neither waits for RTDS nor
+ * registers update notifications. Inputs, result slots, and the output byte arena must not overlap.
+ * All memory is module-owned. Numeric and boolean reads use native fallback semantics. Non-boolean
+ * runtime-feature reads are invalid. A boolean fallback is not automatically the compiled
+ * runtime-feature default.
+ *
+ * @param context is a live http_filter_config Envoy handle for the current hook.
+ * @param requests is an array of requests, valid for the duration of this call.
+ * @param requests_size is the request/result count, at most RUNTIME_MAX_KEYS above.
+ * @param condition is an optional application revision comparison, or nullptr.
+ * @param values is an array with requests_size writable entries; nullptr is valid for zero entries.
+ * @param strings is writable storage for copied strings, or nullptr when strings_capacity is zero.
+ * @param strings_capacity is the arena capacity, at most RUNTIME_MAX_OUTPUT_BYTES above.
+ * @param strings_size_out must be non-null. Receives bytes used on Ok or required on
+ * BufferTooSmall; zero on other results. All other outputs must be discarded unless the result is
+ * Ok.
+ * @return status for the complete batch. A BufferTooSmall retry must repeat the entire batch,
+ *         including its condition; the retry can observe a newer snapshot. Bound retries.
+ */
+envoy_dynamic_module_type_runtime_read_result
+envoy_dynamic_module_callback_http_filter_config_runtime_read_batch(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr context,
+    const envoy_dynamic_module_type_runtime_request* requests, size_t requests_size,
+    const envoy_dynamic_module_type_runtime_condition* condition,
+    envoy_dynamic_module_type_runtime_value* values, char* strings, size_t strings_capacity,
+    size_t* strings_size_out);
+
+/**
+ * Read requested values from one retained, merged runtime snapshot during the current main-thread
+ * cluster hook. Never call using a cached host pointer from a module-created thread or after host
+ * destruction. This reads local state only. It neither waits for RTDS nor registers update
+ * notifications. Inputs, result slots, and the output byte arena must not overlap. All memory is
+ * module-owned. Numeric and boolean reads use native fallback semantics. Non-boolean
+ * runtime-feature reads are invalid. A boolean fallback is not automatically the compiled
+ * runtime-feature default.
+ *
+ * @param context is a live cluster Envoy handle for the current hook.
+ * @param requests is an array of requests, valid for the duration of this call.
+ * @param requests_size is the request/result count, at most RUNTIME_MAX_KEYS above.
+ * @param condition is an optional application revision comparison, or nullptr.
+ * @param values is an array with requests_size writable entries; nullptr is valid for zero entries.
+ * @param strings is writable storage for copied strings, or nullptr when strings_capacity is zero.
+ * @param strings_capacity is the arena capacity, at most RUNTIME_MAX_OUTPUT_BYTES above.
+ * @param strings_size_out must be non-null. Receives bytes used on Ok or required on
+ * BufferTooSmall; zero on other results. All other outputs must be discarded unless the result is
+ * Ok.
+ * @return status for the complete batch. A BufferTooSmall retry must repeat the entire batch,
+ *         including its condition; the retry can observe a newer snapshot. Bound retries.
+ */
+envoy_dynamic_module_type_runtime_read_result
+envoy_dynamic_module_callback_cluster_runtime_read_batch(
+    envoy_dynamic_module_type_cluster_envoy_ptr context,
+    const envoy_dynamic_module_type_runtime_request* requests, size_t requests_size,
+    const envoy_dynamic_module_type_runtime_condition* condition,
+    envoy_dynamic_module_type_runtime_value* values, char* strings, size_t strings_capacity,
+    size_t* strings_size_out);
+
+/**
+ * Read requested values from one retained, merged runtime snapshot during the current
+ * dynamic-cluster load-balancer worker hook. Never call using a cached host pointer from a
+ * module-created thread or after host destruction. This reads local state only. It neither waits
+ * for RTDS nor registers update notifications. Inputs, result slots, and the output byte arena must
+ * not overlap. All memory is module-owned. Numeric and boolean reads use native fallback semantics.
+ * Non-boolean runtime-feature reads are invalid. A boolean fallback is not automatically the
+ * compiled runtime-feature default.
+ *
+ * @param context is a live cluster_lb Envoy handle for the current hook.
+ * @param requests is an array of requests, valid for the duration of this call.
+ * @param requests_size is the request/result count, at most RUNTIME_MAX_KEYS above.
+ * @param condition is an optional application revision comparison, or nullptr.
+ * @param values is an array with requests_size writable entries; nullptr is valid for zero entries.
+ * @param strings is writable storage for copied strings, or nullptr when strings_capacity is zero.
+ * @param strings_capacity is the arena capacity, at most RUNTIME_MAX_OUTPUT_BYTES above.
+ * @param strings_size_out must be non-null. Receives bytes used on Ok or required on
+ * BufferTooSmall; zero on other results. All other outputs must be discarded unless the result is
+ * Ok.
+ * @return status for the complete batch. A BufferTooSmall retry must repeat the entire batch,
+ *         including its condition; the retry can observe a newer snapshot. Bound retries.
+ */
+envoy_dynamic_module_type_runtime_read_result
+envoy_dynamic_module_callback_cluster_lb_runtime_read_batch(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr context,
+    const envoy_dynamic_module_type_runtime_request* requests, size_t requests_size,
+    const envoy_dynamic_module_type_runtime_condition* condition,
+    envoy_dynamic_module_type_runtime_value* values, char* strings, size_t strings_capacity,
+    size_t* strings_size_out);
 
 #ifdef __cplusplus
 }

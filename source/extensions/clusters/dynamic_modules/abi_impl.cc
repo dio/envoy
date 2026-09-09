@@ -16,6 +16,7 @@
 #include "source/extensions/clusters/dynamic_modules/cluster.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/dynamic_modules/abi_context_accessors.h"
+#include "source/extensions/dynamic_modules/runtime.h"
 
 using Envoy::Extensions::DynamicModules::ContextAccessor;
 
@@ -1784,3 +1785,42 @@ bool envoy_dynamic_module_callback_cluster_lb_get_member_update_host_packed_addr
 }
 
 } // extern "C"
+
+extern "C" envoy_dynamic_module_type_runtime_read_result
+envoy_dynamic_module_callback_cluster_runtime_read_batch(
+    envoy_dynamic_module_type_cluster_envoy_ptr context,
+    const envoy_dynamic_module_type_runtime_request* requests, size_t requests_size,
+    const envoy_dynamic_module_type_runtime_condition* condition,
+    envoy_dynamic_module_type_runtime_value* values, char* strings, size_t strings_capacity,
+    size_t* strings_size_out) {
+  namespace Thread = Envoy::Thread;
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+  if (context == nullptr) {
+    if (strings_size_out != nullptr) {
+      *strings_size_out = 0;
+    }
+    return envoy_dynamic_module_type_runtime_read_result_InvalidArgument;
+  }
+  return Envoy::Extensions::DynamicModules::readRuntimeBatch(
+      getCluster(context)->runtime(), requests, requests_size, condition, values, strings,
+      strings_capacity, strings_size_out);
+}
+
+extern "C" envoy_dynamic_module_type_runtime_read_result
+envoy_dynamic_module_callback_cluster_lb_runtime_read_batch(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr context,
+    const envoy_dynamic_module_type_runtime_request* requests, size_t requests_size,
+    const envoy_dynamic_module_type_runtime_condition* condition,
+    envoy_dynamic_module_type_runtime_value* values, char* strings, size_t strings_capacity,
+    size_t* strings_size_out) {
+
+  if (context == nullptr) {
+    if (strings_size_out != nullptr) {
+      *strings_size_out = 0;
+    }
+    return envoy_dynamic_module_type_runtime_read_result_InvalidArgument;
+  }
+  return Envoy::Extensions::DynamicModules::readRuntimeBatch(
+      getLb(context)->handle()->cluster()->runtime(), requests, requests_size, condition, values,
+      strings, strings_capacity, strings_size_out);
+}

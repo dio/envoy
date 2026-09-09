@@ -1,3 +1,4 @@
+load("@rules_go//go:def.bzl", "go_test")
 load(
     "@rules_rust//rust:defs.bzl",
     "rust_clippy",
@@ -15,6 +16,19 @@ load(
 licenses(["notice"])  # Apache 2
 
 envoy_package()
+
+envoy_cc_test(
+    name = "runtime_test",
+    srcs = ["runtime_test.cc"],
+    deps = [
+        "//source/common/runtime:runtime_lib",
+        "//source/extensions/dynamic_modules:runtime_lib",
+        "//test/common/stats:stat_test_utility_lib",
+        "//test/mocks:common_lib",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/test_common:status_utility_lib",
+    ],
+)
 
 envoy_cc_dyn_module_test(
     name = "dynamic_modules_test",
@@ -107,4 +121,12 @@ rust_clippy(
     name = "rust_sdk_clippy",
     tags = ["nocoverage"],
     deps = ["//source/extensions/dynamic_modules/sdk/rust:envoy_proxy_dynamic_modules_rust_sdk"],
+)
+
+go_test(
+    name = "go_sdk_manager_test",
+    srcs = [
+        "go_manager_test.go",
+        "//source/extensions/dynamic_modules:sdk/go/abi/manager.go",
+    ],
 )

@@ -349,6 +349,8 @@ public:
   }
 
   // Methods called by the dynamic module via ABI callbacks.
+  Runtime::Loader& runtime() const { return server_context_.runtime(); }
+
   bool addHosts(
       const std::vector<std::string>& addresses, const std::vector<uint32_t>& weights,
       const std::vector<std::string>& regions, const std::vector<std::string>& zones,

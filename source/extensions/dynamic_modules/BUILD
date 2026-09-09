@@ -10,6 +10,18 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_cc_library(
+    name = "runtime_lib",
+    srcs = ["runtime.cc"],
+    hdrs = ["runtime.h"],
+    deps = [
+        "//envoy/runtime:runtime_interface",
+        "//source/common/runtime:runtime_features_lib",
+        "//source/extensions/dynamic_modules/abi",
+        "@abseil-cpp//absl/strings:string_view",
+    ],
+)
+
+envoy_cc_library(
     name = "dynamic_modules_lib",
     srcs = [
         "background_fetch_manager.cc",
@@ -94,6 +106,7 @@ go_library(
         "sdk/go/shared/listener_base.go",
         "sdk/go/shared/network_api.go",
         "sdk/go/shared/network_base.go",
+        "sdk/go/shared/runtime.go",
         "sdk/go/shared/stats_sink.go",
         "sdk/go/shared/stats_sink_api.go",
         "sdk/go/shared/types.go",
@@ -126,7 +139,9 @@ go_library(
     srcs = [
         "sdk/go/abi/internal.go",
         "sdk/go/abi/listener.go",
+        "sdk/go/abi/manager.go",
         "sdk/go/abi/network.go",
+        "sdk/go/abi/runtime.go",
         "//source/extensions/dynamic_modules/abi:abi.h",
     ],
     cgo = True,
@@ -143,4 +158,9 @@ go_library(
         "//source/extensions/dynamic_modules:go_sdk_internal_buffer",
         "//source/extensions/dynamic_modules:go_sdk_shared",
     ],
+)
+
+exports_files(
+    ["sdk/go/abi/manager.go"],
+    visibility = ["//test/extensions/dynamic_modules:__pkg__"],
 )

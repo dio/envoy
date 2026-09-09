@@ -5,6 +5,7 @@
 #include "envoy/config/core/v3/socket_option.pb.h"
 #include "envoy/registry/registry.h"
 
+#include "source/common/common/thread.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
@@ -14,6 +15,7 @@
 #include "source/common/tracing/tracer_impl.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/dynamic_modules/abi_context_accessors.h"
+#include "source/extensions/dynamic_modules/runtime.h"
 #include "source/extensions/filters/http/dynamic_modules/filter.h"
 
 namespace Envoy {
@@ -2878,3 +2880,46 @@ void envoy_dynamic_module_callback_http_clear_route_cluster_cache(
 } // namespace DynamicModules
 } // namespace Extensions
 } // namespace Envoy
+
+extern "C" envoy_dynamic_module_type_runtime_read_result
+envoy_dynamic_module_callback_http_filter_runtime_read_batch(
+    envoy_dynamic_module_type_http_filter_envoy_ptr context,
+    const envoy_dynamic_module_type_runtime_request* requests, size_t requests_size,
+    const envoy_dynamic_module_type_runtime_condition* condition,
+    envoy_dynamic_module_type_runtime_value* values, char* strings, size_t strings_capacity,
+    size_t* strings_size_out) {
+
+  if (context == nullptr) {
+    if (strings_size_out != nullptr) {
+      *strings_size_out = 0;
+    }
+    return envoy_dynamic_module_type_runtime_read_result_InvalidArgument;
+  }
+  return Envoy::Extensions::DynamicModules::readRuntimeBatch(
+      static_cast<Envoy::Extensions::DynamicModules::HttpFilters::DynamicModuleHttpFilter*>(context)
+          ->getFilterConfig()
+          .runtime(),
+      requests, requests_size, condition, values, strings, strings_capacity, strings_size_out);
+}
+
+extern "C" envoy_dynamic_module_type_runtime_read_result
+envoy_dynamic_module_callback_http_filter_config_runtime_read_batch(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr context,
+    const envoy_dynamic_module_type_runtime_request* requests, size_t requests_size,
+    const envoy_dynamic_module_type_runtime_condition* condition,
+    envoy_dynamic_module_type_runtime_value* values, char* strings, size_t strings_capacity,
+    size_t* strings_size_out) {
+  namespace Thread = Envoy::Thread;
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+  if (context == nullptr) {
+    if (strings_size_out != nullptr) {
+      *strings_size_out = 0;
+    }
+    return envoy_dynamic_module_type_runtime_read_result_InvalidArgument;
+  }
+  return Envoy::Extensions::DynamicModules::readRuntimeBatch(
+      static_cast<Envoy::Extensions::DynamicModules::HttpFilters::DynamicModuleHttpFilterConfig*>(
+          context)
+          ->runtime(),
+      requests, requests_size, condition, values, strings, strings_capacity, strings_size_out);
+}
